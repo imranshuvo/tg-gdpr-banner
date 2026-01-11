@@ -1,0 +1,611 @@
+/**
+ * TG GDPR - Consent Banner Styles
+ * 
+ * Modern, accessible, and fully customizable consent banner styles.
+ * Uses CSS custom properties for easy theming.
+ * 
+ * @package TG_GDPR_Cookie_Consent
+ */
+
+/* CSS Custom Properties */
+:root {
+    --tg-gdpr-primary: #2563eb;
+    --tg-gdpr-primary-hover: #1d4ed8;
+    --tg-gdpr-secondary: #64748b;
+    --tg-gdpr-secondary-hover: #475569;
+    --tg-gdpr-text: #1e293b;
+    --tg-gdpr-text-muted: #64748b;
+    --tg-gdpr-bg: #ffffff;
+    --tg-gdpr-bg-secondary: #f8fafc;
+    --tg-gdpr-border: #e2e8f0;
+    --tg-gdpr-radius: 8px;
+    --tg-gdpr-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    --tg-gdpr-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --tg-gdpr-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --tg-gdpr-z-index: 999999;
+}
+
+/* Reset for banner elements */
+.tg-gdpr-banner *,
+.tg-gdpr-preferences *,
+.tg-gdpr-overlay * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Overlay */
+.tg-gdpr-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: calc(var(--tg-gdpr-z-index) - 1);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--tg-gdpr-transition), visibility var(--tg-gdpr-transition);
+    backdrop-filter: blur(2px);
+}
+
+.tg-gdpr-overlay--visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Banner Base */
+.tg-gdpr-banner {
+    position: fixed;
+    z-index: var(--tg-gdpr-z-index);
+    font-family: var(--tg-gdpr-font);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--tg-gdpr-text);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--tg-gdpr-transition), 
+                visibility var(--tg-gdpr-transition),
+                transform var(--tg-gdpr-transition);
+}
+
+.tg-gdpr-banner--visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Position: Bottom */
+.tg-gdpr-banner--bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: translateY(100%);
+}
+
+.tg-gdpr-banner--bottom.tg-gdpr-banner--visible {
+    transform: translateY(0);
+}
+
+/* Position: Top */
+.tg-gdpr-banner--top {
+    top: 0;
+    left: 0;
+    right: 0;
+    transform: translateY(-100%);
+}
+
+.tg-gdpr-banner--top.tg-gdpr-banner--visible {
+    transform: translateY(0);
+}
+
+/* Position: Bottom Left */
+.tg-gdpr-banner--bottom-left {
+    bottom: 20px;
+    left: 20px;
+    max-width: 400px;
+    transform: translateX(-120%);
+}
+
+.tg-gdpr-banner--bottom-left.tg-gdpr-banner--visible {
+    transform: translateX(0);
+}
+
+/* Position: Bottom Right */
+.tg-gdpr-banner--bottom-right {
+    bottom: 20px;
+    right: 20px;
+    max-width: 400px;
+    transform: translateX(120%);
+}
+
+.tg-gdpr-banner--bottom-right.tg-gdpr-banner--visible {
+    transform: translateX(0);
+}
+
+/* Position: Center */
+.tg-gdpr-banner--center {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    max-width: 500px;
+    width: calc(100% - 40px);
+}
+
+.tg-gdpr-banner--center.tg-gdpr-banner--visible {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Layout: Box */
+.tg-gdpr-banner--box .tg-gdpr-banner__container {
+    background: var(--tg-gdpr-bg);
+    border-radius: var(--tg-gdpr-radius);
+    box-shadow: var(--tg-gdpr-shadow);
+    padding: 24px;
+    margin: 20px;
+}
+
+/* Layout: Bar */
+.tg-gdpr-banner--bar .tg-gdpr-banner__container {
+    background: var(--tg-gdpr-bg);
+    box-shadow: var(--tg-gdpr-shadow);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.tg-gdpr-banner--bar.tg-gdpr-banner--bottom .tg-gdpr-banner__container,
+.tg-gdpr-banner--bar.tg-gdpr-banner--top .tg-gdpr-banner__container {
+    margin: 0;
+    border-radius: 0;
+}
+
+/* Banner Container */
+.tg-gdpr-banner__container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Banner Content */
+.tg-gdpr-banner__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.tg-gdpr-banner__title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--tg-gdpr-text);
+    margin-bottom: 8px;
+}
+
+.tg-gdpr-banner__message {
+    color: var(--tg-gdpr-text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.tg-gdpr-banner__link {
+    color: var(--tg-gdpr-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.tg-gdpr-banner__link:hover {
+    text-decoration: underline;
+}
+
+/* Banner Actions */
+.tg-gdpr-banner__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.tg-gdpr-banner--box .tg-gdpr-banner__actions {
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
+/* Buttons */
+.tg-gdpr-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    border-radius: var(--tg-gdpr-radius);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all var(--tg-gdpr-transition);
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.tg-gdpr-btn:focus {
+    outline: 2px solid var(--tg-gdpr-primary);
+    outline-offset: 2px;
+}
+
+.tg-gdpr-btn--primary {
+    background: var(--tg-gdpr-primary);
+    color: #ffffff;
+    border-color: var(--tg-gdpr-primary);
+}
+
+.tg-gdpr-btn--primary:hover {
+    background: var(--tg-gdpr-primary-hover);
+    border-color: var(--tg-gdpr-primary-hover);
+}
+
+.tg-gdpr-btn--secondary {
+    background: transparent;
+    color: var(--tg-gdpr-secondary);
+    border-color: var(--tg-gdpr-border);
+}
+
+.tg-gdpr-btn--secondary:hover {
+    background: var(--tg-gdpr-bg-secondary);
+    color: var(--tg-gdpr-secondary-hover);
+}
+
+.tg-gdpr-btn--outline {
+    background: transparent;
+    color: var(--tg-gdpr-primary);
+    border-color: var(--tg-gdpr-primary);
+}
+
+.tg-gdpr-btn--outline:hover {
+    background: var(--tg-gdpr-primary);
+    color: #ffffff;
+}
+
+/* Preferences Panel */
+.tg-gdpr-preferences {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--tg-gdpr-z-index) + 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--tg-gdpr-transition), visibility var(--tg-gdpr-transition);
+    font-family: var(--tg-gdpr-font);
+    font-size: 14px;
+    color: var(--tg-gdpr-text);
+}
+
+.tg-gdpr-preferences--visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.tg-gdpr-preferences__container {
+    background: var(--tg-gdpr-bg);
+    border-radius: calc(var(--tg-gdpr-radius) * 1.5);
+    box-shadow: var(--tg-gdpr-shadow);
+    max-width: 600px;
+    width: 100%;
+    max-height: calc(100vh - 40px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(20px) scale(0.95);
+    transition: transform var(--tg-gdpr-transition);
+}
+
+.tg-gdpr-preferences--visible .tg-gdpr-preferences__container {
+    transform: translateY(0) scale(1);
+}
+
+.tg-gdpr-preferences__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--tg-gdpr-border);
+}
+
+.tg-gdpr-preferences__title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--tg-gdpr-text);
+}
+
+.tg-gdpr-preferences__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--tg-gdpr-bg-secondary);
+    color: var(--tg-gdpr-text-muted);
+    cursor: pointer;
+    transition: all var(--tg-gdpr-transition);
+}
+
+.tg-gdpr-preferences__close:hover {
+    background: var(--tg-gdpr-border);
+    color: var(--tg-gdpr-text);
+}
+
+.tg-gdpr-preferences__close:focus {
+    outline: 2px solid var(--tg-gdpr-primary);
+    outline-offset: 2px;
+}
+
+.tg-gdpr-preferences__body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.tg-gdpr-preferences__intro {
+    color: var(--tg-gdpr-text-muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.tg-gdpr-preferences__footer {
+    display: flex;
+    gap: 12px;
+    padding: 20px 24px;
+    border-top: 1px solid var(--tg-gdpr-border);
+    background: var(--tg-gdpr-bg-secondary);
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+/* Categories */
+.tg-gdpr-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tg-gdpr-category {
+    background: var(--tg-gdpr-bg-secondary);
+    border-radius: var(--tg-gdpr-radius);
+    padding: 16px;
+    transition: background var(--tg-gdpr-transition);
+}
+
+.tg-gdpr-category:hover {
+    background: #f1f5f9;
+}
+
+.tg-gdpr-category__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tg-gdpr-category__name {
+    font-weight: 600;
+    color: var(--tg-gdpr-text);
+    flex: 1;
+}
+
+.tg-gdpr-category__required {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--tg-gdpr-primary);
+    background: rgba(37, 99, 235, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.tg-gdpr-category__description {
+    color: var(--tg-gdpr-text-muted);
+    font-size: 13px;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+
+/* Toggle Switch */
+.tg-gdpr-toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.tg-gdpr-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.tg-gdpr-toggle__slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--tg-gdpr-border);
+    border-radius: 24px;
+    transition: all var(--tg-gdpr-transition);
+}
+
+.tg-gdpr-toggle__slider::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: all var(--tg-gdpr-transition);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tg-gdpr-toggle input:checked + .tg-gdpr-toggle__slider {
+    background: var(--tg-gdpr-primary);
+}
+
+.tg-gdpr-toggle input:checked + .tg-gdpr-toggle__slider::before {
+    transform: translateX(20px);
+}
+
+.tg-gdpr-toggle input:focus + .tg-gdpr-toggle__slider {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.tg-gdpr-toggle input:disabled + .tg-gdpr-toggle__slider {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Settings Button (floating) */
+.tg-gdpr-settings-float {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: calc(var(--tg-gdpr-z-index) - 2);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--tg-gdpr-primary);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all var(--tg-gdpr-transition);
+}
+
+.tg-gdpr-settings-float:hover {
+    background: var(--tg-gdpr-primary-hover);
+    transform: scale(1.1);
+}
+
+.tg-gdpr-settings-float:focus {
+    outline: 2px solid var(--tg-gdpr-primary);
+    outline-offset: 2px;
+}
+
+.tg-gdpr-settings-float svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .tg-gdpr-banner--bar .tg-gdpr-banner__container {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+
+    .tg-gdpr-banner__actions {
+        justify-content: center;
+    }
+
+    .tg-gdpr-banner--bottom-left,
+    .tg-gdpr-banner--bottom-right {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        transform: translateY(100%);
+    }
+
+    .tg-gdpr-banner--bottom-left.tg-gdpr-banner--visible,
+    .tg-gdpr-banner--bottom-right.tg-gdpr-banner--visible {
+        transform: translateY(0);
+    }
+
+    .tg-gdpr-preferences__container {
+        max-height: calc(100vh - 20px);
+        margin: 10px;
+    }
+
+    .tg-gdpr-preferences__footer {
+        flex-direction: column;
+    }
+
+    .tg-gdpr-btn {
+        width: 100%;
+    }
+
+    .tg-gdpr-settings-float {
+        bottom: 10px;
+        left: 10px;
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    .tg-gdpr-banner,
+    .tg-gdpr-overlay,
+    .tg-gdpr-preferences,
+    .tg-gdpr-preferences__container,
+    .tg-gdpr-toggle__slider,
+    .tg-gdpr-toggle__slider::before,
+    .tg-gdpr-btn,
+    .tg-gdpr-category,
+    .tg-gdpr-settings-float {
+        transition: none;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .tg-gdpr-banner,
+    .tg-gdpr-preferences__container {
+        border: 2px solid #000000;
+    }
+
+    .tg-gdpr-btn {
+        border-width: 2px;
+    }
+
+    .tg-gdpr-toggle__slider {
+        border: 2px solid #000000;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .tg-gdpr-banner:not([data-theme="light"]),
+    .tg-gdpr-preferences:not([data-theme="light"]) {
+        --tg-gdpr-text: #f1f5f9;
+        --tg-gdpr-text-muted: #94a3b8;
+        --tg-gdpr-bg: #1e293b;
+        --tg-gdpr-bg-secondary: #334155;
+        --tg-gdpr-border: #475569;
+    }
+}
+
+/* Print - hide banner */
+@media print {
+    .tg-gdpr-banner,
+    .tg-gdpr-overlay,
+    .tg-gdpr-preferences,
+    .tg-gdpr-settings-float {
+        display: none !important;
+    }
+}

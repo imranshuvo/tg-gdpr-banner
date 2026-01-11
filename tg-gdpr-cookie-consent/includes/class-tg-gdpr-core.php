@@ -66,6 +66,9 @@ class TG_GDPR_Core {
         require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-consent-manager.php';
         require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-cookie-manager.php';
         require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-license-manager.php';
+        
+        // SaaS API sync handler
+        require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-api-sync.php';
 
         $this->loader = new TG_GDPR_Loader();
     }
