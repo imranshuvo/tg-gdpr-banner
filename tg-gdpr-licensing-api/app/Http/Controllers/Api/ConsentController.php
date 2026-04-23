@@ -13,8 +13,8 @@ use Illuminate\Http\JsonResponse;
 class ConsentController extends Controller
 {
     /**
-     * Get site settings for the WordPress plugin
-     * Called on plugin init to fetch latest settings
+     * Get site settings for the client integration
+     * Called during integration bootstrap to fetch latest settings
      */
     public function getSettings(Request $request): JsonResponse
     {
@@ -51,8 +51,8 @@ class ConsentController extends Controller
     }
 
     /**
-     * Sync consent records from WordPress plugin
-     * Called periodically (every 5 minutes) with batch of consent records
+     * Sync consent records from the client integration
+     * Called periodically (every 5 minutes) with a batch of consent records
      */
     public function syncConsents(Request $request): JsonResponse
     {
@@ -163,7 +163,7 @@ class ConsentController extends Controller
     }
 
     /**
-     * Sync session statistics from WordPress
+     * Sync session statistics from the client integration
      */
     public function syncSessions(Request $request): JsonResponse
     {

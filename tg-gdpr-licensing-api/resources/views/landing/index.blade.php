@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>TG GDPR Cookie Banner - WordPress GDPR Compliance Made Easy</title>
-    <meta name="description" content="Professional GDPR compliant cookie consent banner for WordPress. Easy setup, customizable, and fully compliant with EU regulations.">
+    <title>{{ config('app.name') }} - GDPR Compliance Made Easy</title>
+    <meta name="description" content="Professional GDPR compliant cookie consent platform for modern websites. Easy setup, customizable, and fully aligned with EU regulations.">
     
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -15,7 +15,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
                     <a href="/" class="text-2xl font-bold text-indigo-600">
-                        TG GDPR Banner
+                        {{ config('app.name') }}
                     </a>
                 </div>
                 <div class="hidden md:flex items-center space-x-8">
@@ -42,7 +42,7 @@
                     GDPR Compliance Made Simple
                 </h1>
                 <p class="text-xl md:text-2xl mb-8 text-indigo-100">
-                    Professional cookie consent banner for WordPress. EU compliant, customizable, and easy to use.
+                    Professional cookie consent platform for modern websites. EU compliant, customizable, and easy to use.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <a href="#pricing" class="bg-white text-indigo-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
@@ -309,7 +309,7 @@
                 <details class="bg-white rounded-lg p-6 shadow-md">
                     <summary class="font-semibold text-lg cursor-pointer">What is GDPR compliance?</summary>
                     <p class="mt-4 text-gray-600">
-                        GDPR (General Data Protection Regulation) is a European law that requires websites to get user consent before storing cookies or tracking data. Our plugin ensures your website meets these requirements.
+                        GDPR (General Data Protection Regulation) is a European law that requires websites to get user consent before storing cookies or tracking data. Cookiely helps your site meet these requirements.
                     </p>
                 </details>
 
@@ -323,7 +323,7 @@
                 <details class="bg-white rounded-lg p-6 shadow-md">
                     <summary class="font-semibold text-lg cursor-pointer">How easy is it to install?</summary>
                     <p class="mt-4 text-gray-600">
-                        Very easy! Install the plugin, activate your license, and configure your preferences. The whole process takes less than 5 minutes.
+                        Very easy. Connect Cookiely to your site, activate your license, and configure your preferences. The whole process takes less than 5 minutes.
                     </p>
                 </details>
 
@@ -351,14 +351,14 @@
                 Try the Free Version
             </h2>
             <p class="text-xl mb-8 text-indigo-100">
-                Get started with our free version available on WordPress.org
+                Request access to the free version and get setup details by email.
             </p>
             <form action="{{ route('download') }}" method="POST" class="max-w-md mx-auto">
                 @csrf
                 <div class="flex gap-4">
                     <input type="email" name="email" required placeholder="Enter your email" class="flex-1 px-4 py-3 rounded-lg text-gray-900">
                     <button type="submit" class="bg-white text-indigo-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
-                        Download
+                        Get Access
                     </button>
                 </div>
             </form>
@@ -428,9 +428,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid md:grid-cols-4 gap-8 mb-8">
                 <div>
-                    <h3 class="text-white font-bold text-lg mb-4">TG GDPR Banner</h3>
+                    <h3 class="text-white font-bold text-lg mb-4">{{ config('app.name') }}</h3>
                     <p class="text-sm">
-                        Making GDPR compliance simple for WordPress websites.
+                        Making GDPR compliance simple for modern websites.
                     </p>
                 </div>
                 <div>
@@ -459,7 +459,7 @@
                 </div>
             </div>
             <div class="border-t border-gray-800 pt-8 text-center text-sm">
-                <p>&copy; {{ date('Y') }} TG GDPR Banner. All rights reserved.</p>
+                <p>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</p>
             </div>
         </div>
     </footer>

@@ -73,8 +73,8 @@ class TG_GDPR_Admin {
     public function add_admin_menu() {
         // Main menu
         add_menu_page(
-            __('TG GDPR Cookie Consent', 'tg-gdpr-cookie-consent'),
-            __('TG GDPR', 'tg-gdpr-cookie-consent'),
+            __('Cookiely', 'tg-gdpr-cookie-consent'),
+            __('Cookiely', 'tg-gdpr-cookie-consent'),
             'manage_options',
             'tg-gdpr-cookie-consent',
             array($this, 'display_admin_page'),

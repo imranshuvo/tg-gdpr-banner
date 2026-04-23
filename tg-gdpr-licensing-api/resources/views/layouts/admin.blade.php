@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Admin Panel') - TG GDPR Licensing</title>
+    <title>@yield('title', 'Admin Panel') - {{ config('app.name') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,8 +13,8 @@
         <!-- Sidebar -->
         <aside class="w-64 bg-gray-900 text-white flex-shrink-0">
             <div class="p-6">
-                <h1 class="text-2xl font-bold text-blue-400">TG GDPR</h1>
-                <p class="text-gray-400 text-sm">License Management</p>
+                <h1 class="text-2xl font-bold text-blue-400">{{ config('app.name') }}</h1>
+                <p class="text-gray-400 text-sm">Compliance Dashboard</p>
             </div>
             
             <nav class="mt-6">

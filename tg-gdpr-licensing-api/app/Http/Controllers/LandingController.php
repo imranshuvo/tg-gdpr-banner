@@ -115,8 +115,6 @@ class LandingController extends Controller
             'source' => 'free_download',
         ]);
 
-        // Return download link
-        return redirect()->away('https://wordpress.org/plugins/tg-gdpr-cookie-banner/')
-            ->with('success', 'Download started! Check your email for the free version.');
+        return back()->with('success', 'Thanks. We received your request and will send free access details to your email.');
     }
 }

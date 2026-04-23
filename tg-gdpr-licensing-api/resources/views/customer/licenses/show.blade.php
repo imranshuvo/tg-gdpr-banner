@@ -191,20 +191,20 @@
             <!-- Installation Instructions -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Installation Instructions</h3>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Setup Instructions</h3>
                     <div class="prose max-w-none text-sm text-gray-600">
                         <ol class="space-y-3">
                             <li>
-                                <strong>Install the Plugin:</strong> Upload and activate the TG GDPR Banner plugin on your WordPress site.
+                                <strong>Open Cookiely:</strong> Access the Cookiely integration for the site you want to activate.
                             </li>
                             <li>
-                                <strong>Enter License Key:</strong> Go to <code class="bg-gray-100 px-2 py-1 rounded text-xs">Settings → TG GDPR Banner</code> in your WordPress admin.
+                                <strong>Open the License Screen:</strong> Navigate to the license settings in Cookiely.
                             </li>
                             <li>
                                 <strong>Activate:</strong> Paste your license key: <code class="bg-gray-100 px-2 py-1 rounded text-xs">{{ $license->license_key }}</code>
                             </li>
                             <li>
-                                <strong>Click Activate:</strong> The plugin will verify your license and unlock all premium features.
+                                <strong>Click Activate:</strong> Cookiely will verify your license and unlock all premium features.
                             </li>
                         </ol>
                         <div class="mt-4 p-4 bg-blue-50 rounded-lg">

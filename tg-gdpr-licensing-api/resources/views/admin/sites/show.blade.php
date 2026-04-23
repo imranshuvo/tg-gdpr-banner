@@ -75,7 +75,7 @@
                     <h5 class="mb-0">Site Token</h5>
                     <form method="POST" action="{{ route('admin.sites.regenerate-token', $site) }}" class="d-inline">
                         @csrf
-                        <button type="submit" class="btn btn-sm btn-outline-warning" onclick="return confirm('Regenerate token? The WordPress plugin will need to be updated.')">
+                        <button type="submit" class="btn btn-sm btn-outline-warning" onclick="return confirm('Regenerate token? The site integration will need to be updated.')">
                             <i class="bi bi-arrow-clockwise me-1"></i> Regenerate
                         </button>
                     </form>
@@ -87,7 +87,7 @@
                             <i class="bi bi-clipboard"></i> Copy
                         </button>
                     </div>
-                    <small class="text-muted">Use this token in your WordPress plugin settings</small>
+                    <small class="text-muted">Use this token in your site integration settings</small>
                 </div>
             </div>
 

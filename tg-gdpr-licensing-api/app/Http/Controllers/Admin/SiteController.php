@@ -344,7 +344,7 @@ class SiteController extends Controller
         
         return redirect()
             ->route('admin.sites.show', $site)
-            ->with('success', 'Site token regenerated. Update your WordPress plugin with the new token.');
+            ->with('success', 'Site token regenerated. Update your site integration with the new token.');
     }
 
     /**

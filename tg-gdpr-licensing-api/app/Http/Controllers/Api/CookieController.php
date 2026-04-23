@@ -136,7 +136,7 @@ class CookieController extends Controller
     }
 
     /**
-     * Submit scanned cookies from WordPress plugin
+     * Submit scanned cookies from the client integration
      */
     public function submitScan(Request $request): JsonResponse
     {

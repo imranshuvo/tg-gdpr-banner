@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: TG GDPR Cookie Consent
+ * Plugin Name: Cookiely
  * Plugin URI: https://techgenesis.com/tg-gdpr-cookie-consent
- * Description: Performance-first GDPR cookie consent plugin. Fully compliant, works with all optimization plugins, beautiful UI inspired by CookieYes.
+ * Description: Cookiely is a performance-first GDPR cookie consent plugin. Fully compliant, works with all optimization plugins, with a beautiful and fast user experience.
  * Version: 1.0.0
  * Author: TechGenesis
  * Author URI: https://techgenesis.com

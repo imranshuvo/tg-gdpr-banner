@@ -27,7 +27,7 @@ if (isset($_POST['tg_gdpr_save_settings']) && check_admin_referer('tg_gdpr_setti
     
     <div class="tg-gdpr-admin-header">
         <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
-        <p><?php _e('Configure your GDPR cookie consent banner and settings.', 'tg-gdpr-cookie-consent'); ?></p>
+        <p><?php _e('Configure your Cookiely cookie banner and settings.', 'tg-gdpr-cookie-consent'); ?></p>
     </div>
     
     <form method="post" action="" class="tg-gdpr-settings-form">
@@ -107,7 +107,7 @@ if (isset($_POST['tg_gdpr_save_settings']) && check_admin_referer('tg_gdpr_setti
             <div class="tg-gdpr-form-row">
                 <label><?php _e('License Key', 'tg-gdpr-cookie-consent'); ?></label>
                 <input type="text" name="tg_gdpr_settings[pro][license_key]" value="<?php echo esc_attr($settings['pro']['license_key'] ?? ''); ?>" placeholder="XXXX-XXXX-XXXX-XXXX">
-                <p class="description"><?php _e('Enter your Pro license key to unlock advanced features.', 'tg-gdpr-cookie-consent'); ?> <a href="https://techgenesis.com/tg-gdpr-pro/" target="_blank"><?php _e('Get Pro', 'tg-gdpr-cookie-consent'); ?></a></p>
+                <p class="description"><?php _e('Enter your Cookiely Pro license key to unlock advanced features.', 'tg-gdpr-cookie-consent'); ?> <a href="https://techgenesis.com/tg-gdpr-pro/" target="_blank"><?php _e('Get Pro', 'tg-gdpr-cookie-consent'); ?></a></p>
             </div>
             
             <?php if ($is_pro_active) : ?>

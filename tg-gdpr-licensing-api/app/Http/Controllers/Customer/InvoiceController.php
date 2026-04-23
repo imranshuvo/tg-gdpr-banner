@@ -60,7 +60,7 @@ class InvoiceController extends Controller
         try {
             return $user->downloadInvoice($invoiceId, [
                 'vendor' => config('app.name'),
-                'product' => 'TG GDPR Banner License',
+                'product' => config('app.name') . ' License',
             ]);
         } catch (\Exception $e) {
             return redirect()

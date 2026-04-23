@@ -7,7 +7,7 @@ use App\Models\License;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Services\Logging\ActivityLogger;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class LicenseController extends Controller
 {
@@ -83,8 +83,11 @@ class LicenseController extends Controller
             ]
         );
 
-        $content = "TG GDPR Banner License Key\n";
-        $content .= "==========================\n\n";
+        $productName = config('app.name', 'Cookiely');
+        $heading = $productName . ' License Key';
+
+        $content = $heading . "\n";
+        $content .= str_repeat('=', strlen($heading)) . "\n\n";
         $content .= "Customer: {$customer->name}\n";
         $content .= "Email: {$customer->email}\n";
         $content .= "License Key: {$license->license_key}\n";
@@ -94,12 +97,12 @@ class LicenseController extends Controller
         $content .= "Status: {$license->status}\n\n";
         $content .= "Instructions:\n";
         $content .= "1. Copy the license key above\n";
-        $content .= "2. In your WordPress admin, go to Settings → TG GDPR Banner\n";
-        $content .= "3. Enter the license key in the License Key field\n";
+        $content .= "2. Open the Cookiely integration for your site\n";
+        $content .= "3. Navigate to the license settings and enter the key\n";
         $content .= "4. Click 'Activate License'\n\n";
         $content .= "Need help? Contact support at support@example.com\n";
 
-        $filename = "tg-gdpr-license-{$license->license_key}.txt";
+        $filename = Str::slug($productName) . "-license-{$license->license_key}.txt";
 
         return response($content)
             ->header('Content-Type', 'text/plain')

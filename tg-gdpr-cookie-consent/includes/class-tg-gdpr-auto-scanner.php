@@ -68,7 +68,7 @@ class TG_GDPR_Auto_Scanner {
         if (!$force && !$this->is_enabled()) {
             return array(
                 'success' => false,
-                'message' => 'Auto Scanner is disabled. Enable it in TG GDPR settings to run scheduled scans.',
+                'message' => 'Auto Scanner is disabled. Enable it in Cookiely settings to run scheduled scans.',
             );
         }
 
