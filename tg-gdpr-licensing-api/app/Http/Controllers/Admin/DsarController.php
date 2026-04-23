@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Mail\DsarCompletedMail;
+use App\Mail\DsarRejectedMail;
 use App\Http\Controllers\Controller;
 use App\Models\DsarRequest;
 use App\Models\ConsentRecord;
+use App\Models\Site;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 class DsarController extends Controller
@@ -28,20 +33,31 @@ class DsarController extends Controller
         if ($request->filled('customer_id')) {
             $query->where('customer_id', $request->customer_id);
         }
+
+        if ($request->filled('site_id')) {
+            $query->where('site_id', $request->site_id);
+        }
         
         // Show overdue first, then by due date
         $query->orderByRaw('CASE WHEN due_date < NOW() AND status NOT IN ("completed", "rejected", "cancelled") THEN 0 ELSE 1 END')
               ->orderBy('due_date');
         
         $requests = $query->paginate(20)->withQueryString();
-        
-        // Get counts for quick filters
-        $pendingCount = DsarRequest::whereNotIn('status', ['completed', 'rejected', 'cancelled'])->count();
-        $overdueCount = DsarRequest::where('due_date', '<', now())
-            ->whereNotIn('status', ['completed', 'rejected', 'cancelled'])
-            ->count();
-        
-        return view('admin.dsar.index', compact('requests', 'pendingCount', 'overdueCount'));
+
+        $stats = [
+            'total' => DsarRequest::count(),
+            'pending' => DsarRequest::where('status', 'pending_verification')->count(),
+            'verified' => DsarRequest::where('status', 'verified')->count(),
+            'processing' => DsarRequest::where('status', 'processing')->count(),
+            'completed' => DsarRequest::where('status', 'completed')->count(),
+            'overdue' => DsarRequest::where('due_date', '<', now())
+                ->whereNotIn('status', ['completed', 'rejected', 'cancelled'])
+                ->count(),
+        ];
+
+        $sites = Site::query()->orderBy('domain')->get(['id', 'domain']);
+
+        return view('admin.dsar.index', compact('requests', 'stats', 'sites'));
     }
 
     /**
@@ -50,16 +66,12 @@ class DsarController extends Controller
     public function show(DsarRequest $dsarRequest)
     {
         $dsarRequest->load(['site', 'customer', 'processor']);
-        
-        // Get related consent records if site is specified
-        $consentRecords = [];
-        if ($dsarRequest->site_id) {
-            $consentRecords = ConsentRecord::where('site_id', $dsarRequest->site_id)
-                ->whereRaw("visitor_hash IN (SELECT visitor_hash FROM consent_records WHERE site_id = ? ORDER BY created_at DESC LIMIT 1)", [$dsarRequest->site_id])
-                ->latest()
-                ->limit(50)
-                ->get();
-        }
+
+        $consentRecords = $this->scopedConsentRecordsQuery($dsarRequest)
+            ->with('site')
+            ->latest()
+            ->limit(50)
+            ->get();
         
         return view('admin.dsar.show', compact('dsarRequest', 'consentRecords'));
     }
@@ -88,11 +100,29 @@ class DsarController extends Controller
             'admin_notes' => 'nullable|string|max:2000',
             'rejection_reason' => 'required_if:action,reject|string|max:500',
         ]);
+
+        if ($request->action === 'complete' && $dsarRequest->request_type === 'rectification' && blank($request->admin_notes)) {
+            return back()->with('error', 'Add admin notes describing the rectification action before completing this request.');
+        }
+
+        if ($request->action === 'complete' && $dsarRequest->requiresScopedConsentLookup() && !$dsarRequest->hasVisitorHash()) {
+            return back()->with('error', 'This request cannot be auto-processed because no visitor hash was supplied with the request.');
+        }
+
+        if ($request->action === 'complete' && $dsarRequest->requiresScopedConsentLookup()) {
+            $matchingRecords = $this->scopedConsentRecordsQuery($dsarRequest)->count();
+
+            if ($matchingRecords === 0 && blank($request->admin_notes)) {
+                return back()->with('error', 'No consent records matched this visitor hash. Add admin notes before completing the request so the zero-data outcome is explicitly reviewed.');
+            }
+        }
         
         $dsarRequest->update(['admin_notes' => $request->admin_notes]);
         
         if ($request->action === 'reject') {
             $dsarRequest->reject($request->rejection_reason);
+            Mail::to($dsarRequest->requester_email)->send(new DsarRejectedMail($dsarRequest));
+
             return redirect()
                 ->route('admin.dsar.index')
                 ->with('success', 'Request rejected.');
@@ -112,13 +142,16 @@ class DsarController extends Controller
                 break;
                 
             case 'restriction':
+            case 'objection':
                 $this->processRestriction($dsarRequest);
                 break;
         }
         
         $dsarRequest->complete($exportPath);
-        
-        // TODO: Send completion email to requester
+
+        Mail::to($dsarRequest->requester_email)->send(
+            new DsarCompletedMail($dsarRequest, $this->getDownloadUrl($dsarRequest))
+        );
         
         return redirect()
             ->route('admin.dsar.index')
@@ -133,25 +166,21 @@ class DsarController extends Controller
         $data = [
             'request_info' => [
                 'type' => $dsarRequest->request_type,
+                'request_type_label' => DsarRequest::getRequestTypeLabel($dsarRequest->request_type),
+                'requester_email' => $dsarRequest->requester_email,
+                'requester_name' => $dsarRequest->requester_name,
+                'visitor_hash' => $dsarRequest->visitor_hash,
                 'requested_at' => $dsarRequest->created_at->toIso8601String(),
                 'completed_at' => now()->toIso8601String(),
             ],
             'consent_records' => [],
         ];
-        
-        // Get all consent records for this email
-        // Note: We search by email hash or any matching visitor records
-        if ($dsarRequest->site_id) {
-            $records = ConsentRecord::where('site_id', $dsarRequest->site_id)
-                ->latest()
-                ->limit(1000)
-                ->get();
-        } else {
-            // All sites for this customer
-            $records = ConsentRecord::whereHas('site', function ($q) use ($dsarRequest) {
-                $q->where('customer_id', $dsarRequest->customer_id);
-            })->latest()->limit(1000)->get();
-        }
+
+        $records = $this->scopedConsentRecordsQuery($dsarRequest)
+            ->with('site')
+            ->latest()
+            ->limit(1000)
+            ->get();
         
         foreach ($records as $record) {
             $data['consent_records'][] = [
@@ -179,14 +208,7 @@ class DsarController extends Controller
      */
     private function processErasure(DsarRequest $dsarRequest): void
     {
-        if ($dsarRequest->site_id) {
-            // Delete from specific site
-            ConsentRecord::where('site_id', $dsarRequest->site_id)->delete();
-        } else {
-            // Delete from all customer sites
-            $siteIds = $dsarRequest->customer->sites()->pluck('id');
-            ConsentRecord::whereIn('site_id', $siteIds)->delete();
-        }
+        $this->scopedConsentRecordsQuery($dsarRequest)->delete();
     }
 
     /**
@@ -194,15 +216,16 @@ class DsarController extends Controller
      */
     private function processRestriction(DsarRequest $dsarRequest): void
     {
-        // Mark all consent records as withdrawn
-        if ($dsarRequest->site_id) {
-            ConsentRecord::where('site_id', $dsarRequest->site_id)
-                ->whereNull('withdrawn_at')
-                ->update([
-                    'withdrawn_at' => now(),
-                    'withdrawal_reason' => 'DSAR restriction request',
-                ]);
-        }
+        $reason = $dsarRequest->request_type === 'objection'
+            ? 'DSAR objection request'
+            : 'DSAR restriction request';
+
+        $this->scopedConsentRecordsQuery($dsarRequest)
+            ->whereNull('withdrawn_at')
+            ->update([
+                'withdrawn_at' => now(),
+                'withdrawal_reason' => $reason,
+            ]);
     }
 
     /**
@@ -216,6 +239,40 @@ class DsarController extends Controller
         
         $dsarRequest->increment('download_count');
         
-        return Storage::download($dsarRequest->data_export_path, 'data-export.json');
+        return Storage::download($dsarRequest->data_export_path, sprintf('dsar-request-%d.json', $dsarRequest->id));
+    }
+
+    /**
+     * Get the consent records scoped to the request subject.
+     */
+    private function scopedConsentRecordsQuery(DsarRequest $dsarRequest): Builder
+    {
+        $query = ConsentRecord::query();
+
+        if ($dsarRequest->site_id) {
+            $query->where('site_id', $dsarRequest->site_id);
+        } else {
+            $query->whereHas('site', function (Builder $siteQuery) use ($dsarRequest) {
+                $siteQuery->where('customer_id', $dsarRequest->customer_id);
+            });
+        }
+
+        if (!$dsarRequest->hasVisitorHash()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('visitor_hash', $dsarRequest->visitor_hash);
+    }
+
+    /**
+     * Get the requester download URL for export-based requests.
+     */
+    private function getDownloadUrl(DsarRequest $dsarRequest): ?string
+    {
+        if (empty($dsarRequest->data_export_path) || empty($dsarRequest->verification_token)) {
+            return null;
+        }
+
+        return url('/api/v1/dsar/download/' . $dsarRequest->verification_token);
     }
 }

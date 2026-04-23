@@ -31,7 +31,10 @@ return new class extends Migration
             
             $table->unique(['cookie_name', 'provider']);
             $table->index('category');
-            $table->fullText(['cookie_name', 'provider', 'description']);
+
+            if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+                $table->fullText(['cookie_name', 'provider', 'description']);
+            }
         });
         
         // Site-specific cookies (overrides or custom)

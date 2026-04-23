@@ -244,9 +244,13 @@ class TG_GDPR_Auto_Scanner {
                 continue;
             }
 
-            $pattern = '#(?:' . $cookie->script_pattern . ')#i';
+            $pattern = $this->build_script_pattern_regex($cookie->script_pattern);
 
-            if (@preg_match($pattern, $body)) {
+            if (empty($pattern)) {
+                continue;
+            }
+
+            if (preg_match($pattern, $body) === 1) {
                 $this->store_cookie($detected, array(
                     'name' => $cookie->cookie_name,
                     'category' => $cookie->category,
@@ -257,6 +261,26 @@ class TG_GDPR_Auto_Scanner {
                 ));
             }
         }
+    }
+
+    /**
+     * Build a safe regex from stored script fragments.
+     *
+     * @param string $script_pattern Stored pipe-delimited fragments.
+     * @return string|null
+     */
+    private function build_script_pattern_regex($script_pattern) {
+        $fragments = array_filter(array_map('trim', explode('|', (string) $script_pattern)));
+
+        if (empty($fragments)) {
+            return null;
+        }
+
+        $escaped_fragments = array_map(function ($fragment) {
+            return preg_quote($fragment, '#');
+        }, $fragments);
+
+        return '#(?:' . implode('|', $escaped_fragments) . ')#i';
     }
 
     /**

@@ -148,11 +148,11 @@ class ConsentController extends Controller
         $session = SiteSession::getOrCreateForToday($site->id);
         $session->recordConsent($validated['consent_method'], $validated['consent_categories']);
         
-        if ($validated['country_code']) {
+        if (!empty($validated['country_code'])) {
             $session->recordGeo($validated['country_code']);
         }
         
-        if ($validated['device_type']) {
+        if (!empty($validated['device_type'])) {
             $session->recordDevice($validated['device_type']);
         }
         

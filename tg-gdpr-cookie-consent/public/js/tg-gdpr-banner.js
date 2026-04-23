@@ -21,6 +21,7 @@
     
     // Cookie settings
     const COOKIE_NAME = 'tg_gdpr_consent';
+    const VISITOR_HASH_COOKIE = 'tg_gdpr_visitor_hash';
     const COOKIE_DAYS = settings.cookie_expiry || 365;
     const COOKIE_VERSION = settings.policy_version || '1.0';
     
@@ -159,6 +160,86 @@
         }
 
         document.cookie = cookieOptions.join('; ');
+    }
+
+    /**
+     * Check whether a visitor hash is valid.
+     * @param {string|null} value
+     * @returns {boolean}
+     */
+    function isValidVisitorHash(value) {
+        return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+    }
+
+    /**
+     * Generate random hexadecimal bytes.
+     * @param {number} bytes
+     * @returns {string}
+     */
+    function generateRandomHex(bytes) {
+        if (window.crypto?.getRandomValues) {
+            const buffer = new Uint8Array(bytes);
+            window.crypto.getRandomValues(buffer);
+
+            return Array.from(buffer, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        let value = '';
+
+        for (let i = 0; i < bytes; i++) {
+            value += Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+        }
+
+        return value;
+    }
+
+    /**
+     * Generate a UUID for consent records.
+     * @returns {string}
+     */
+    function generateConsentId() {
+        if (window.crypto?.randomUUID) {
+            return window.crypto.randomUUID();
+        }
+
+        const hex = generateRandomHex(16);
+
+        return [
+            hex.slice(0, 8),
+            hex.slice(8, 12),
+            `4${hex.slice(13, 16)}`,
+            `${((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0')}${hex.slice(18, 20)}`,
+            hex.slice(20, 32)
+        ].join('-');
+    }
+
+    /**
+     * Convert banner interaction state into the Laravel API contract.
+     * @param {string|null} interaction
+     * @returns {string}
+     */
+    function normalizeConsentMethod(interaction) {
+        switch (interaction) {
+            case 'accept_all':
+                return 'accept_all';
+            case 'reject_all':
+                return 'reject_all';
+            case 'implicit':
+                return 'implicit';
+            default:
+                return 'customize';
+        }
+    }
+
+    /**
+     * Normalize the policy version to the integer schema expected by the API.
+     * @param {string|number} version
+     * @returns {number}
+     */
+    function normalizePolicyVersion(version) {
+        const normalized = parseInt(String(version || COOKIE_VERSION), 10);
+
+        return Number.isFinite(normalized) && normalized > 0 ? normalized : 1;
     }
 
     /**
@@ -622,16 +703,19 @@
             return;
         }
 
-        // Generate visitor hash
         const visitorHash = generateVisitorHash();
-
         const payload = {
             site_token: siteToken,
+            consent_id: generateConsentId(),
             visitor_hash: visitorHash,
-            consent_data: consent,
-            user_agent: navigator.userAgent,
-            page_url: window.location.href,
-            referrer: document.referrer
+            consent_categories: {
+                necessary: !!consent.necessary,
+                functional: !!consent.functional,
+                analytics: !!consent.analytics,
+                marketing: !!consent.marketing,
+            },
+            consent_method: normalizeConsentMethod(consent.interaction),
+            policy_version: normalizePolicyVersion(consent.version),
         };
 
         // Use sendBeacon for reliability (won't block page unload)
@@ -656,29 +740,20 @@
     }
 
     /**
-     * Generate a consistent visitor hash
+     * Generate a stable visitor hash for consent and DSAR matching.
      * @returns {string}
      */
     function generateVisitorHash() {
-        const components = [
-            navigator.userAgent,
-            navigator.language,
-            new Date().getTimezoneOffset(),
-            screen.width,
-            screen.height,
-            screen.colorDepth
-        ];
+        const existing = getCookie(VISITOR_HASH_COOKIE);
 
-        const str = components.join('|');
-        let hash = 0;
-        
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
+        if (isValidVisitorHash(existing)) {
+            return existing.toLowerCase();
         }
 
-        return Math.abs(hash).toString(16);
+        const generated = generateRandomHex(32);
+        setCookie(VISITOR_HASH_COOKIE, generated, COOKIE_DAYS);
+
+        return generated;
     }
 
     /**

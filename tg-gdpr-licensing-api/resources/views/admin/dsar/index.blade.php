@@ -5,6 +5,18 @@
 @section('content')
 <div class="py-6">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        @if(session('success'))
+            <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
             <div>
@@ -14,18 +26,22 @@
         </div>
 
         <!-- Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 mb-6">
             <div class="bg-white rounded-lg shadow p-4">
                 <p class="text-sm font-medium text-gray-500">Total Requests</p>
                 <p class="text-2xl font-semibold text-gray-900">{{ $stats['total'] ?? 0 }}</p>
             </div>
             <div class="bg-yellow-50 rounded-lg shadow p-4">
-                <p class="text-sm font-medium text-yellow-700">Pending</p>
+                <p class="text-sm font-medium text-yellow-700">Pending Verification</p>
                 <p class="text-2xl font-semibold text-yellow-900">{{ $stats['pending'] ?? 0 }}</p>
             </div>
             <div class="bg-blue-50 rounded-lg shadow p-4">
-                <p class="text-sm font-medium text-blue-700">In Progress</p>
-                <p class="text-2xl font-semibold text-blue-900">{{ $stats['in_progress'] ?? 0 }}</p>
+                <p class="text-sm font-medium text-blue-700">Verified</p>
+                <p class="text-2xl font-semibold text-blue-900">{{ $stats['verified'] ?? 0 }}</p>
+            </div>
+            <div class="bg-indigo-50 rounded-lg shadow p-4">
+                <p class="text-sm font-medium text-indigo-700">Processing</p>
+                <p class="text-2xl font-semibold text-indigo-900">{{ $stats['processing'] ?? 0 }}</p>
             </div>
             <div class="bg-green-50 rounded-lg shadow p-4">
                 <p class="text-sm font-medium text-green-700">Completed</p>
@@ -48,6 +64,7 @@
                             <option value="access" {{ request('type') === 'access' ? 'selected' : '' }}>Access (Art. 15)</option>
                             <option value="rectification" {{ request('type') === 'rectification' ? 'selected' : '' }}>Rectification (Art. 16)</option>
                             <option value="erasure" {{ request('type') === 'erasure' ? 'selected' : '' }}>Erasure (Art. 17)</option>
+                            <option value="restriction" {{ request('type') === 'restriction' ? 'selected' : '' }}>Restriction (Art. 18)</option>
                             <option value="portability" {{ request('type') === 'portability' ? 'selected' : '' }}>Portability (Art. 20)</option>
                             <option value="objection" {{ request('type') === 'objection' ? 'selected' : '' }}>Objection (Art. 21)</option>
                         </select>
@@ -57,9 +74,9 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
                         <select name="status" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                             <option value="">All Statuses</option>
-                            <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
+                            <option value="pending_verification" {{ request('status') === 'pending_verification' ? 'selected' : '' }}>Pending Verification</option>
                             <option value="verified" {{ request('status') === 'verified' ? 'selected' : '' }}>Verified</option>
-                            <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                            <option value="processing" {{ request('status') === 'processing' ? 'selected' : '' }}>Processing</option>
                             <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Completed</option>
                             <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
                         </select>
@@ -96,6 +113,7 @@
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitor Hash</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
@@ -113,10 +131,11 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @php
-                                    $typeInfo = match($request->type) {
+                                    $typeInfo = match($request->request_type) {
                                         'access' => ['Access', 'Art. 15', 'bg-blue-100 text-blue-800'],
                                         'rectification' => ['Rectification', 'Art. 16', 'bg-yellow-100 text-yellow-800'],
                                         'erasure' => ['Erasure', 'Art. 17', 'bg-red-100 text-red-800'],
+                                        'restriction' => ['Restriction', 'Art. 18', 'bg-cyan-100 text-cyan-800'],
                                         'portability' => ['Portability', 'Art. 20', 'bg-purple-100 text-purple-800'],
                                         'objection' => ['Objection', 'Art. 21', 'bg-orange-100 text-orange-800'],
                                         default => ['Unknown', '', 'bg-gray-100 text-gray-800'],
@@ -128,15 +147,22 @@
                                 <span class="text-xs text-gray-500 ml-1">{{ $typeInfo[1] }}</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">{{ $request->first_name }} {{ $request->last_name }}</div>
-                                <div class="text-xs text-gray-500">{{ $request->email }}</div>
+                                <div class="text-sm text-gray-900">{{ $request->requester_name ?: 'Unspecified' }}</div>
+                                <div class="text-xs text-gray-500">{{ $request->requester_email }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                @if($request->visitor_hash)
+                                    <code class="rounded bg-gray-100 px-2 py-1 text-xs">{{ \Illuminate\Support\Str::limit($request->visitor_hash, 16, '...') }}</code>
+                                @else
+                                    <span class="text-xs text-amber-700">Missing</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @php
                                     $statusClass = match($request->status) {
-                                        'pending' => 'bg-yellow-100 text-yellow-800',
+                                        'pending_verification' => 'bg-yellow-100 text-yellow-800',
                                         'verified' => 'bg-blue-100 text-blue-800',
-                                        'in_progress' => 'bg-indigo-100 text-indigo-800',
+                                        'processing' => 'bg-indigo-100 text-indigo-800',
                                         'completed' => 'bg-green-100 text-green-800',
                                         'rejected' => 'bg-red-100 text-red-800',
                                         default => 'bg-gray-100 text-gray-800',
@@ -147,11 +173,11 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $request->created_at->format('M d, Y') }}
+                                {{ $request->created_at->format('M d, Y H:i') }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @php
-                                    $deadline = $request->created_at->addDays(30);
+                                    $deadline = $request->due_date ?? $request->created_at->copy()->addDays(30);
                                     $daysLeft = now()->diffInDays($deadline, false);
                                     $isOverdue = $daysLeft < 0;
                                 @endphp
@@ -172,26 +198,23 @@
                                 <a href="{{ route('admin.dsar.show', $request) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">
                                     View
                                 </a>
-                                @if($request->status === 'pending')
+                                @if($request->status === 'verified')
                                     <form action="{{ route('admin.dsar.start', $request) }}" method="POST" class="inline">
                                         @csrf
                                         <button type="submit" class="text-green-600 hover:text-green-900">
                                             Start
                                         </button>
                                     </form>
-                                @elseif($request->status === 'in_progress')
-                                    <form action="{{ route('admin.dsar.process', $request) }}" method="POST" class="inline">
-                                        @csrf
-                                        <button type="submit" class="text-green-600 hover:text-green-900">
-                                            Complete
-                                        </button>
-                                    </form>
+                                @elseif($request->status === 'completed' && $request->data_export_path)
+                                    <a href="{{ route('admin.dsar.download', $request) }}" class="text-green-600 hover:text-green-900">
+                                        Download
+                                    </a>
                                 @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="9" class="px-6 py-12 text-center text-gray-500">
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>

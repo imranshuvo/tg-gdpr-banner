@@ -61,6 +61,14 @@ class TG_GDPR_Consent_Manager {
         
         // Save consent
         $this->save_consent($validated_consent);
+
+        if (class_exists('TG_GDPR_API_Sync')) {
+            $api_sync = TG_GDPR_API_Sync::get_instance();
+
+            if ($api_sync->is_configured()) {
+                $api_sync->queue_consent($validated_consent);
+            }
+        }
         
         // Log consent (Pro feature)
         if ($this->is_pro_active() && $this->is_consent_logging_enabled()) {

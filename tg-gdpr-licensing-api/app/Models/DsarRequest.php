@@ -16,6 +16,7 @@ class DsarRequest extends Model
         'requester_name',
         'requester_phone',
         'additional_info',
+        'visitor_hash',
         'verification_token',
         'verification_sent_at',
         'verified_at',
@@ -125,6 +126,16 @@ class DsarRequest extends Model
             'completed_at' => now(),
             'rejection_reason' => $reason,
         ]);
+    }
+
+    public function requiresScopedConsentLookup(): bool
+    {
+        return in_array($this->request_type, ['access', 'portability', 'erasure', 'restriction', 'objection'], true);
+    }
+
+    public function hasVisitorHash(): bool
+    {
+        return !empty($this->visitor_hash);
     }
 
     public static function getRequestTypeLabel(string $type): string

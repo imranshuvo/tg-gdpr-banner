@@ -11,6 +11,13 @@
 class TG_GDPR_API_Sync {
 
     /**
+     * Visitor hash cookie name.
+     *
+     * @var string
+     */
+    private $visitor_hash_cookie = 'tg_gdpr_visitor_hash';
+
+    /**
      * API base URL.
      *
      * @var string
@@ -83,15 +90,23 @@ class TG_GDPR_API_Sync {
      */
     public function queue_consent($consent) {
         $pending = get_option('tg_gdpr_pending_consents', array());
+        $consent_categories = array(
+            'necessary' => !empty($consent['necessary']),
+            'functional' => !empty($consent['functional']),
+            'analytics' => !empty($consent['analytics']),
+            'marketing' => !empty($consent['marketing']),
+        );
+        $user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '';
         
         $pending[] = array(
-            'consent' => $consent,
+            'consent_id' => wp_generate_uuid4(),
             'visitor_hash' => $this->generate_visitor_hash(),
-            'ip_address' => $this->get_anonymized_ip(),
-            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '',
-            'page_url' => isset($_SERVER['REQUEST_URI']) ? esc_url_raw(home_url($_SERVER['REQUEST_URI'])) : '',
-            'referrer' => isset($_SERVER['HTTP_REFERER']) ? esc_url_raw($_SERVER['HTTP_REFERER']) : '',
-            'timestamp' => current_time('mysql', true),
+            'ip_anonymized' => $this->get_anonymized_ip(),
+            'consent_categories' => $consent_categories,
+            'consent_method' => $this->normalize_consent_method($consent, $consent_categories),
+            'policy_version' => $this->normalize_policy_version(isset($consent['version']) ? $consent['version'] : null),
+            'user_agent_hash' => !empty($user_agent) ? hash('sha256', $user_agent) : null,
+            'created_at' => gmdate('c'),
         );
         
         update_option('tg_gdpr_pending_consents', $pending);
@@ -279,14 +294,25 @@ class TG_GDPR_API_Sync {
             return array('success' => false, 'error' => 'API not configured');
         }
 
+        $requester_name = '';
+
+        if (!empty($data['name'])) {
+            $requester_name = sanitize_text_field($data['name']);
+        } else {
+            $requester_name = trim(implode(' ', array_filter(array(
+                isset($data['first_name']) ? sanitize_text_field($data['first_name']) : '',
+                isset($data['last_name']) ? sanitize_text_field($data['last_name']) : '',
+            ))));
+        }
+
         $response = $this->api_request('POST', 'api/v1/dsar/submit', array(
             'site_token' => $this->site_token,
-            'type' => $data['type'],
-            'email' => $data['email'],
-            'first_name' => isset($data['first_name']) ? $data['first_name'] : '',
-            'last_name' => isset($data['last_name']) ? $data['last_name'] : '',
-            'phone' => isset($data['phone']) ? $data['phone'] : '',
-            'message' => isset($data['message']) ? $data['message'] : '',
+            'request_type' => isset($data['type']) ? sanitize_text_field($data['type']) : '',
+            'requester_email' => isset($data['email']) ? sanitize_email($data['email']) : '',
+            'requester_name' => $requester_name,
+            'requester_phone' => isset($data['phone']) ? sanitize_text_field($data['phone']) : '',
+            'additional_info' => isset($data['message']) ? sanitize_textarea_field($data['message']) : '',
+            'visitor_hash' => $this->normalize_visitor_hash(isset($data['visitor_hash']) ? $data['visitor_hash'] : ''),
         ));
 
         return $response;
@@ -372,6 +398,10 @@ class TG_GDPR_API_Sync {
      * @return string
      */
     private function generate_visitor_hash() {
+        if (!empty($_COOKIE[$this->visitor_hash_cookie]) && preg_match('/^[a-f0-9]{64}$/i', (string) $_COOKIE[$this->visitor_hash_cookie])) {
+            return strtolower(sanitize_text_field(wp_unslash($_COOKIE[$this->visitor_hash_cookie])));
+        }
+
         $components = array(
             isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '',
             isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? $_SERVER['HTTP_ACCEPT_LANGUAGE'] : '',
@@ -379,6 +409,65 @@ class TG_GDPR_API_Sync {
         );
         
         return hash('sha256', implode('|', $components));
+    }
+
+    /**
+     * Normalize an incoming visitor hash to the canonical stored format.
+     *
+     * @param string $provided_hash Incoming visitor hash.
+     * @return string
+     */
+    private function normalize_visitor_hash($provided_hash) {
+        $provided_hash = sanitize_text_field((string) $provided_hash);
+
+        if (!empty($provided_hash) && preg_match('/^[a-f0-9]{64}$/i', $provided_hash)) {
+            return strtolower($provided_hash);
+        }
+
+        return $this->generate_visitor_hash();
+    }
+
+    /**
+     * Normalize consent method to the API contract.
+     *
+     * @param array $consent Raw consent data.
+     * @param array $categories Normalized categories.
+     * @return string
+     */
+    private function normalize_consent_method($consent, $categories) {
+        if (!empty($consent['interaction'])) {
+            $interaction = sanitize_key($consent['interaction']);
+
+            if ($interaction === 'custom') {
+                return 'customize';
+            }
+
+            if (in_array($interaction, array('accept_all', 'reject_all', 'customize', 'implicit'), true)) {
+                return $interaction;
+            }
+        }
+
+        if (!empty($categories['functional']) && !empty($categories['analytics']) && !empty($categories['marketing'])) {
+            return 'accept_all';
+        }
+
+        if (empty($categories['functional']) && empty($categories['analytics']) && empty($categories['marketing'])) {
+            return 'reject_all';
+        }
+
+        return 'customize';
+    }
+
+    /**
+     * Normalize policy version to the integer API schema.
+     *
+     * @param mixed $version Policy version.
+     * @return int
+     */
+    private function normalize_policy_version($version) {
+        $normalized = absint($version);
+
+        return $normalized > 0 ? $normalized : 1;
     }
 
     /**

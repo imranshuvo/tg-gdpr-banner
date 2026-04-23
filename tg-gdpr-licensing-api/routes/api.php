@@ -45,9 +45,9 @@ Route::prefix('v1')->group(function () {
     // DSAR (Data Subject Access Requests)
     Route::prefix('dsar')->group(function () {
         Route::post('submit', [DsarController::class, 'submit']);
-        Route::get('verify/{token}', [DsarController::class, 'verify']);
-        Route::get('status/{token}', [DsarController::class, 'status']);
-        Route::get('download/{token}', [DsarController::class, 'download'])->name('api.dsar.download-file');
+        Route::get('verify/{token}', [DsarController::class, 'verify'])->name('api.dsar.verify');
+        Route::get('status/{token}', [DsarController::class, 'status'])->name('api.dsar.status');
+        Route::get('download/{token}', [DsarController::class, 'download'])->name('api.dsar.download');
     });
 });
 

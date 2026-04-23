@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Mail\DsarVerificationMail;
+use App\Mail\NewDsarRequestMail;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\DsarRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class DsarController extends Controller
 {
@@ -25,13 +29,29 @@ class DsarController extends Controller
             ], 401);
         }
         
-        $validated = $request->validate([
+        $normalizedPayload = [
+            'request_type' => $request->input('request_type', $request->input('type')),
+            'requester_email' => $request->input('requester_email', $request->input('email')),
+            'requester_name' => trim((string) $request->input(
+                'requester_name',
+                implode(' ', array_filter([
+                    $request->input('first_name'),
+                    $request->input('last_name'),
+                ]))
+            )),
+            'requester_phone' => $request->input('requester_phone', $request->input('phone')),
+            'additional_info' => $request->input('additional_info', $request->input('message')),
+            'visitor_hash' => $request->input('visitor_hash'),
+        ];
+
+        $validated = validator($normalizedPayload, [
             'request_type' => 'required|in:access,erasure,rectification,portability,restriction,objection',
             'requester_email' => 'required|email|max:255',
             'requester_name' => 'nullable|string|max:255',
             'requester_phone' => 'nullable|string|max:20',
             'additional_info' => 'nullable|string|max:2000',
-        ]);
+            'visitor_hash' => 'nullable|string|size:64|regex:/^[a-f0-9]{64}$/i',
+        ])->validate();
         
         $dsarRequest = DsarRequest::create(array_merge($validated, [
             'site_id' => $site->id,
@@ -121,7 +141,7 @@ class DsarController extends Controller
     /**
      * Download data export (for portability/access requests)
      */
-    public function download(Request $request, string $token): JsonResponse
+    public function download(Request $request, string $token)
     {
         $dsarRequest = DsarRequest::where('verification_token', $token)
             ->where('status', 'completed')
@@ -141,14 +161,20 @@ class DsarController extends Controller
                 'message' => 'Export has expired',
             ], 410);
         }
+
+        if (!Storage::exists($dsarRequest->data_export_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Export file is no longer available',
+            ], 404);
+        }
         
-        // Return download URL (actual download handled by storage)
         $dsarRequest->increment('download_count');
-        
-        return response()->json([
-            'success' => true,
-            'download_url' => route('api.dsar.download-file', ['token' => $token]),
-        ]);
+
+        return Storage::download(
+            $dsarRequest->data_export_path,
+            sprintf('dsar-%s-request-%d.json', $dsarRequest->request_type, $dsarRequest->id)
+        );
     }
 
     /**
@@ -156,11 +182,9 @@ class DsarController extends Controller
      */
     private function sendVerificationEmail(DsarRequest $dsarRequest): void
     {
-        // In production, use proper mail template
-        $verificationUrl = config('app.url') . '/api/v1/dsar/verify/' . $dsarRequest->verification_token;
-        
-        // TODO: Send actual email
-        // Mail::to($dsarRequest->requester_email)->send(new DsarVerificationMail($dsarRequest, $verificationUrl));
+        $verificationUrl = url('/api/v1/dsar/verify/' . $dsarRequest->verification_token);
+
+        Mail::to($dsarRequest->requester_email)->send(new DsarVerificationMail($dsarRequest, $verificationUrl));
         
         $dsarRequest->update(['verification_sent_at' => now()]);
     }
@@ -170,8 +194,17 @@ class DsarController extends Controller
      */
     private function notifyAdminOfNewRequest(DsarRequest $dsarRequest): void
     {
-        // TODO: Send notification to admins
-        // Notification::send(User::admins()->get(), new NewDsarRequestNotification($dsarRequest));
+        $recipients = $this->getAdminNotificationRecipients();
+
+        if (empty($recipients)) {
+            return;
+        }
+
+        $adminUrl = url('/admin/dsar/' . $dsarRequest->id);
+
+        foreach ($recipients as $email) {
+            Mail::to($email)->send(new NewDsarRequestMail($dsarRequest, $adminUrl));
+        }
     }
 
     /**
@@ -186,5 +219,22 @@ class DsarController extends Controller
         }
         
         return Site::where('site_token', $token)->first();
+    }
+
+    /**
+     * Get the configured admin notification recipients.
+     *
+     * @return array<int, string>
+     */
+    private function getAdminNotificationRecipients(): array
+    {
+        $configRecipients = array_filter((array) config('app.admin_emails', []));
+        $adminUsers = User::query()
+            ->where('role', 'admin')
+            ->pluck('email')
+            ->filter()
+            ->all();
+
+        return array_values(array_unique(array_merge($configRecipients, $adminUsers)));
     }
 }
