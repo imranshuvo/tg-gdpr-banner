@@ -341,38 +341,6 @@
      * @returns {string}
      */
     function getBannerHTML() {
-        const title = settings.content?.title || settings.i18n?.default_title || 'We value your privacy';
-        const message = settings.content?.message || settings.i18n?.default_message || 
-            'We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.';
-        const privacyUrl = settings.privacy_url || '#';
-        const privacyText = settings.i18n?.privacy_link || 'Privacy Policy';
-
-        return `
-            <div class="tg-gdpr-banner__container">
-                <div class="tg-gdpr-banner__content">
-                    <h2 class="tg-gdpr-banner__title">${escapeHTML(title)}</h2>
-                    <p class="tg-gdpr-banner__message">
-                        ${escapeHTML(message)}
-                        <a href="${escapeHTML(privacyUrl)}" class="tg-gdpr-banner__link" target="_blank" rel="noopener">
-                            ${escapeHTML(privacyText)}
-                        </a>
-                    </p>
-                </div>
-                <div class="tg-gdpr-banner__actions">
-                    <button type="button" class="tg-gdpr-btn tg-gdpr-btn--secondary" data-action="reject">
-                        ${escapeHTML(settings.i18n?.reject_all || 'Reject All')}
-                    </button>
-                    <button type="button" class="tg-gdpr-btn tg-gdpr-btn--outline" data-action="settings">
-                        ${escapeHTML(settings.i18n?.manage || 'Manage Preferences')}
-                    </button>
-                    <button type="button" class="tg-gdpr-btn tg-gdpr-btn--primary" data-action="accept">
-                        ${escapeHTML(settings.i18n?.accept_all || 'Accept All')}
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-        function getBannerHTML() {
             const title = settings.content?.title || settings.i18n?.default_title || 'We value your privacy';
             const message = settings.content?.message || settings.i18n?.default_message ||
                 'We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic.';
