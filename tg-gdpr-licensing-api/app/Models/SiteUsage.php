@@ -24,6 +24,11 @@ class SiteUsage extends Model
     ];
 
     protected $casts = [
+        'year' => 'integer',
+        'month' => 'integer',
+        'total_sessions' => 'integer',
+        'total_consents' => 'integer',
+        'session_limit' => 'integer',
         'limit_exceeded' => 'boolean',
         'billed' => 'boolean',
         'limit_exceeded_at' => 'datetime',

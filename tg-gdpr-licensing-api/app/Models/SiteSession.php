@@ -25,6 +25,15 @@ class SiteSession extends Model
 
     protected $casts = [
         'date' => 'date',
+        'total_sessions' => 'integer',
+        'banner_shown' => 'integer',
+        'consent_given' => 'integer',
+        'consent_denied' => 'integer',
+        'consent_customized' => 'integer',
+        'no_action' => 'integer',
+        'accepted_functional' => 'integer',
+        'accepted_analytics' => 'integer',
+        'accepted_marketing' => 'integer',
         'geo_breakdown' => 'array',
         'device_breakdown' => 'array',
     ];
