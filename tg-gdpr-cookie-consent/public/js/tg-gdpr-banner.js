@@ -372,6 +372,51 @@
             </div>
         `;
     }
+        function getBannerHTML() {
+            const title = settings.content?.title || settings.i18n?.default_title || 'We value your privacy';
+            const message = settings.content?.message || settings.i18n?.default_message ||
+                'We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic.';
+            const privacyUrl = settings.privacy_url || '#';
+            const privacyText = settings.i18n?.privacy_link || 'Privacy Policy';
+            const showBranding = settings.show_branding !== false;
+
+            return `
+                <div class="tg-gdpr-banner__container">
+                    <div class="tg-gdpr-banner__inner">
+                        <div class="tg-gdpr-banner__icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                                <circle cx="9" cy="9" r="1.5"/>
+                                <circle cx="15" cy="7" r="1"/>
+                                <circle cx="7" cy="14" r="1"/>
+                                <circle cx="13" cy="15" r="1.5"/>
+                                <path d="M21.93 10.35a1 1 0 0 0-.93-.35 3 3 0 0 1-3.27-3.64 1 1 0 0 0-1.24-1.18 3 3 0 0 1-3.42-1.46 1 1 0 0 0-1.8.14A9 9 0 1 0 21.93 10.35z"/>
+                            </svg>
+                        </div>
+                        <div class="tg-gdpr-banner__content">
+                            <h2 class="tg-gdpr-banner__title">${escapeHTML(title)}</h2>
+                            <p class="tg-gdpr-banner__message">
+                                ${escapeHTML(message)}
+                                ${privacyUrl && privacyUrl !== '#' ? `<a href="${escapeHTML(privacyUrl)}" class="tg-gdpr-banner__link" target="_blank" rel="noopener noreferrer">${escapeHTML(privacyText)}</a>` : ''}
+                            </p>
+                        </div>
+                        <div class="tg-gdpr-banner__actions">
+                            <button type="button" class="tg-gdpr-btn tg-gdpr-btn--ghost" data-action="reject">
+                                ${escapeHTML(settings.i18n?.reject_all || 'Reject All')}
+                            </button>
+                            <button type="button" class="tg-gdpr-btn tg-gdpr-btn--outline" data-action="settings">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                ${escapeHTML(settings.i18n?.manage || 'Preferences')}
+                            </button>
+                            <button type="button" class="tg-gdpr-btn tg-gdpr-btn--primary" data-action="accept">
+                                ${escapeHTML(settings.i18n?.accept_all || 'Accept All')}
+                            </button>
+                        </div>
+                    </div>
+                    ${showBranding ? `<div class="tg-gdpr-banner__branding"><span>Powered by <a href="https://cookiely.io" target="_blank" rel="noopener noreferrer" class="tg-gdpr-banner__brand-link">Cookiely</a></span></div>` : ''}
+                </div>
+            `;
+        }
+
 
     /**
      * Attach event listeners to banner

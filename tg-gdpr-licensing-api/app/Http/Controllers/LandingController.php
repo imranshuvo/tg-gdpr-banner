@@ -104,7 +104,7 @@ class LandingController extends Controller
      * Download free version.
      */
     public function download(Request $request)
-    {
+    {        
         $validated = $request->validate([
             'email' => 'required|email|max:255',
         ]);
@@ -116,5 +116,21 @@ class LandingController extends Controller
         ]);
 
         return back()->with('success', 'Thanks. We received your request and will send free access details to your email.');
+    }
+
+    /**
+     * Show the Privacy Policy page.
+     */
+    public function privacyPolicy()
+    {
+        return view('legal.privacy-policy');
+    }
+
+    /**
+     * Show the Terms of Service page.
+     */
+    public function termsOfService()
+    {
+        return view('legal.terms-of-service');
     }
 }

@@ -36,6 +36,24 @@
                     <span class="ml-3">Licenses</span>
                 </a>
             </nav>
+
+                <a href="{{ route('admin.sites.index') }}"
+                   class="flex items-center px-6 py-3 hover:bg-gray-800 {{ request()->routeIs('admin.sites.*') ? 'bg-gray-800 border-l-4 border-blue-500' : '' }}">
+                    <i class="fas fa-globe w-5"></i>
+                    <span class="ml-3">Sites</span>
+                </a>
+
+                <a href="{{ route('admin.dsar.index') }}"
+                   class="flex items-center px-6 py-3 hover:bg-gray-800 {{ request()->routeIs('admin.dsar.*') ? 'bg-gray-800 border-l-4 border-blue-500' : '' }}">
+                    <i class="fas fa-user-shield w-5"></i>
+                    <span class="ml-3">DSARs</span>
+                </a>
+
+                <a href="{{ route('admin.settings.mail') }}"
+                   class="flex items-center px-6 py-3 hover:bg-gray-800 {{ request()->routeIs('admin.settings.*') ? 'bg-gray-800 border-l-4 border-blue-500' : '' }}">
+                    <i class="fas fa-cog w-5"></i>
+                    <span class="ml-3">Settings</span>
+                </a>
         </aside>
 
         <!-- Main Content -->

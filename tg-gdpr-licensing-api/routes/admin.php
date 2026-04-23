@@ -7,10 +7,15 @@ use App\Http\Controllers\Admin\LicenseController;
 use App\Http\Controllers\Admin\SiteController;
 use App\Http\Controllers\Admin\CookieDefinitionController;
 use App\Http\Controllers\Admin\DsarController;
+use App\Http\Controllers\Admin\SettingsController;
 
 // Admin routes - Protected by auth and role:admin middleware
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Mail settings
+        Route::get('settings/mail', [SettingsController::class, 'mail'])->name('settings.mail');
+        Route::post('settings/mail/test', [SettingsController::class, 'testMail'])->name('settings.mail.test');
     
     // Customers
     Route::resource('customers', CustomerController::class);
