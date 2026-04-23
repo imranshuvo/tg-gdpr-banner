@@ -24,8 +24,8 @@ class TG_GDPR_Banner {
     /**
      * Initialize the banner.
      */
-    public function __construct() {
-        $this->settings = get_option('tg_gdpr_settings', array());
+    public function __construct($settings = null) {
+        $this->settings = is_array($settings) ? $settings : get_option('tg_gdpr_settings', array());
         $this->cookie_manager = new TG_GDPR_Cookie_Manager();
     }
 

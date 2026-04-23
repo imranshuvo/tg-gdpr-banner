@@ -379,10 +379,19 @@ class TG_GDPR_API_Sync {
             'site_token' => $this->site_token,
         ));
 
-        if ($response['success'] && isset($response['data']['settings'])) {
-            $settings = $response['data']['settings'];
+        if ($response['success']) {
+            $settings = array();
+
+            if (isset($response['data']['data']) && is_array($response['data']['data'])) {
+                $settings = $response['data']['data'];
+            } elseif (isset($response['data']['settings']) && is_array($response['data']['settings'])) {
+                $settings = $response['data']['settings'];
+            }
+
+            if (!empty($settings)) {
             set_transient($cache_key, $settings, 5 * MINUTE_IN_SECONDS);
             return $settings;
+            }
         }
 
         return null;

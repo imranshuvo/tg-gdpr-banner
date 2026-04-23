@@ -82,8 +82,10 @@ class TG_GDPR_Public {
             
             if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
                 $body = json_decode(wp_remote_retrieve_body($response), true);
-                if (isset($body['settings'])) {
-                    $this->saas_settings = $body['settings'];
+                $settings = $this->extract_saas_settings($body);
+
+                if (!empty($settings)) {
+                    $this->saas_settings = $settings;
                     // Cache for 5 minutes
                     set_transient('tg_gdpr_saas_settings', $this->saas_settings, 5 * MINUTE_IN_SECONDS);
                 }
@@ -186,10 +188,11 @@ class TG_GDPR_Public {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('tg_gdpr_nonce'),
                 'cookie_name' => 'tg_gdpr_consent',
-                'cookie_expiry' => $this->get_cookie_expiry(),
+                'cookie_expiry' => $this->get_cookie_expiry($settings),
                 'policy_version' => isset($settings['policy_version']) ? $settings['policy_version'] : '1.0',
                 'api_url' => isset($license['api_url']) ? $license['api_url'] : '',
                 'site_token' => isset($license['site_token']) ? $license['site_token'] : '',
+                'consent_enforced' => $this->should_enforce_consent($settings),
             )
         );
     }
@@ -215,19 +218,19 @@ class TG_GDPR_Public {
      * @return array
      */
     private function get_gcm_settings($settings) {
+        $gcm = isset($settings['gcm']) && is_array($settings['gcm']) ? $settings['gcm'] : array();
+        $geo_mode = $this->get_geo_targeting_mode($settings);
+        $default_state = $this->get_default_gcm_state($settings);
+
         return array(
-            'default_state' => array(
-                'ad_storage' => 'denied',
-                'analytics_storage' => 'denied',
-                'ad_user_data' => 'denied',
-                'ad_personalization' => 'denied',
-                'functionality_storage' => 'denied',
-                'personalization_storage' => 'denied',
-                'security_storage' => 'granted',
-            ),
-            'wait_for_update' => true,
-            'wait_timeout_ms' => isset($settings['gcm_timeout']) ? (int) $settings['gcm_timeout'] : 500,
-            'region_settings' => $this->get_region_settings($settings),
+            'default_state' => $geo_mode === 'all' ? $default_state : $this->get_permissive_gcm_state(),
+            'wait_for_update' => array_key_exists('wait_for_update', $gcm)
+                ? (bool) $gcm['wait_for_update']
+                : (isset($settings['gcm_wait_for_update']) ? (bool) $settings['gcm_wait_for_update'] : true),
+            'wait_timeout_ms' => isset($gcm['wait_timeout_ms'])
+                ? (int) $gcm['wait_timeout_ms']
+                : (isset($settings['gcm_wait_timeout_ms']) ? (int) $settings['gcm_wait_timeout_ms'] : 500),
+            'region_settings' => $this->get_region_settings($settings, $default_state),
         );
     }
 
@@ -237,24 +240,31 @@ class TG_GDPR_Public {
      * @param array $settings Plugin settings.
      * @return array
      */
-    private function get_region_settings($settings) {
-        // EU countries require strict consent
-        $eu_countries = array('AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-                              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-                              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'GB', 'IS', 'LI', 
-                              'NO', 'CH');
-        
-        $region_settings = array();
-        
-        foreach ($eu_countries as $country) {
-            $region_settings[$country] = array(
-                'ad_storage' => 'denied',
-                'analytics_storage' => 'denied',
-                'ad_user_data' => 'denied',
-                'ad_personalization' => 'denied',
-            );
+    private function get_region_settings($settings, $default_state = null) {
+        $gcm = isset($settings['gcm']) && is_array($settings['gcm']) ? $settings['gcm'] : array();
+        $configured_region_settings = array();
+
+        if (isset($gcm['region_settings']) && is_array($gcm['region_settings'])) {
+            $configured_region_settings = $gcm['region_settings'];
+        } elseif (isset($settings['gcm_region_settings']) && is_array($settings['gcm_region_settings'])) {
+            $configured_region_settings = $settings['gcm_region_settings'];
         }
-        
+
+        $target_countries = $this->get_geo_target_countries($settings);
+
+        if (empty($target_countries)) {
+            return $configured_region_settings;
+        }
+
+        $default_state = is_array($default_state) ? $default_state : $this->get_default_gcm_state($settings);
+        $region_settings = array();
+
+        foreach ($target_countries as $country) {
+            $region_settings[$country] = isset($configured_region_settings[$country]) && is_array($configured_region_settings[$country])
+                ? array_merge($default_state, $configured_region_settings[$country])
+                : $default_state;
+        }
+
         return $region_settings;
     }
 
@@ -266,62 +276,74 @@ class TG_GDPR_Public {
      */
     private function get_banner_settings($settings) {
         $license = isset($settings['license']) ? $settings['license'] : array();
-        $appearance = isset($settings['appearance']) ? $settings['appearance'] : array();
-        $content = isset($settings['content']) ? $settings['content'] : array();
-        $behavior = isset($settings['behavior']) ? $settings['behavior'] : array();
+        $banner = $this->get_banner_config($settings);
+        $content = $this->get_content_config($settings);
+        $behavior = $this->get_behavior_config($settings);
+        $visitor_country = $this->detect_visitor_country();
+        $default_title = isset($content['heading']) ? $content['heading'] : (isset($content['title']) ? $content['title'] : __('We value your privacy', 'tg-gdpr-cookie-consent'));
+        $default_message = isset($content['message'])
+            ? $content['message']
+            : __('We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.', 'tg-gdpr-cookie-consent');
 
         return array(
             'site_token' => isset($license['site_token']) ? $license['site_token'] : '',
             'api_url' => isset($license['api_url']) ? $license['api_url'] : '',
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('tg_gdpr_nonce'),
-            'cookie_expiry' => $this->get_cookie_expiry(),
+            'cookie_expiry' => $this->get_cookie_expiry($settings),
             'policy_version' => isset($settings['policy_version']) ? $settings['policy_version'] : '1.0',
+            'visitor_country' => $visitor_country,
+            'consent_enforced' => $this->should_enforce_consent($settings, $visitor_country),
+            'geo_targeting_mode' => $this->get_geo_targeting_mode($settings),
+            'geo_countries' => $this->get_geo_target_countries($settings),
             
             // Position and layout
-            'position' => isset($appearance['position']) ? $appearance['position'] : 'bottom',
-            'layout' => isset($appearance['layout']) ? $appearance['layout'] : 'box',
+            'position' => isset($banner['position']) ? $banner['position'] : 'bottom',
+            'layout' => isset($banner['layout']) ? $banner['layout'] : 'box',
             'overlay_enabled' => isset($behavior['show_overlay']) ? (bool) $behavior['show_overlay'] : true,
             
             // Appearance
             'appearance' => array(
-                'primary_color' => isset($appearance['primary_color']) ? $appearance['primary_color'] : '#2563eb',
-                'secondary_color' => isset($appearance['secondary_color']) ? $appearance['secondary_color'] : '#64748b',
-                'text_color' => isset($appearance['text_color']) ? $appearance['text_color'] : '#1e293b',
-                'background_color' => isset($appearance['background_color']) ? $appearance['background_color'] : '#ffffff',
-                'border_radius' => isset($appearance['border_radius']) ? (int) $appearance['border_radius'] : 8,
-                'font_family' => isset($appearance['font_family']) ? $appearance['font_family'] : '',
+                'primary_color' => isset($banner['primary_color']) ? $banner['primary_color'] : '#2563eb',
+                'secondary_color' => isset($banner['accent_color']) ? $banner['accent_color'] : (isset($banner['secondary_color']) ? $banner['secondary_color'] : '#64748b'),
+                'text_color' => isset($banner['text_color']) ? $banner['text_color'] : '#1e293b',
+                'background_color' => isset($banner['bg_color']) ? $banner['bg_color'] : (isset($banner['background_color']) ? $banner['background_color'] : '#ffffff'),
+                'border_radius' => isset($banner['border_radius']) ? (int) $banner['border_radius'] : 8,
+                'font_family' => isset($banner['font_family']) ? $banner['font_family'] : '',
             ),
             
             // Content
             'content' => array(
-                'title' => isset($content['title']) ? $content['title'] : __('We value your privacy', 'tg-gdpr-cookie-consent'),
-                'message' => isset($content['message']) ? $content['message'] : __('We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.', 'tg-gdpr-cookie-consent'),
+                'title' => $default_title,
+                'message' => $default_message,
             ),
             
             // URLs
-            'privacy_url' => isset($settings['privacy_url']) ? $settings['privacy_url'] : get_privacy_policy_url(),
+            'privacy_url' => isset($content['privacy_policy_url']) ? $content['privacy_policy_url'] : (isset($settings['privacy_url']) ? $settings['privacy_url'] : get_privacy_policy_url()),
             
             // Internationalization
             'i18n' => array(
-                'accept_all' => __('Accept All', 'tg-gdpr-cookie-consent'),
-                'reject_all' => __('Reject All', 'tg-gdpr-cookie-consent'),
-                'manage' => __('Manage Preferences', 'tg-gdpr-cookie-consent'),
-                'privacy_link' => __('Privacy Policy', 'tg-gdpr-cookie-consent'),
-                'save_preferences' => __('Save Preferences', 'tg-gdpr-cookie-consent'),
+                'accept_all' => isset($content['accept_all_text']) ? $content['accept_all_text'] : __('Accept All', 'tg-gdpr-cookie-consent'),
+                'reject_all' => isset($content['reject_all_text']) ? $content['reject_all_text'] : __('Reject All', 'tg-gdpr-cookie-consent'),
+                'manage' => isset($content['settings_text']) ? $content['settings_text'] : (isset($content['customize_text']) ? $content['customize_text'] : __('Manage Preferences', 'tg-gdpr-cookie-consent')),
+                'privacy_link' => isset($content['privacy_policy_text']) ? $content['privacy_policy_text'] : __('Privacy Policy', 'tg-gdpr-cookie-consent'),
+                'save_preferences' => isset($content['save_preferences_text']) ? $content['save_preferences_text'] : __('Save Preferences', 'tg-gdpr-cookie-consent'),
+                'banner_title' => __('Cookie Consent', 'tg-gdpr-cookie-consent'),
+                'default_title' => $default_title,
+                'default_message' => $default_message,
                 'preferences_title' => __('Cookie Preferences', 'tg-gdpr-cookie-consent'),
                 'preferences_intro' => __('Choose which cookie categories you want to allow. You can change these settings at any time.', 'tg-gdpr-cookie-consent'),
                 'required' => __('Required', 'tg-gdpr-cookie-consent'),
                 
                 // Category names
-                'necessary_name' => __('Necessary', 'tg-gdpr-cookie-consent'),
-                'necessary_desc' => __('Essential cookies required for the website to function properly. Cannot be disabled.', 'tg-gdpr-cookie-consent'),
-                'functional_name' => __('Functional', 'tg-gdpr-cookie-consent'),
-                'functional_desc' => __('Cookies that enable enhanced functionality and personalization.', 'tg-gdpr-cookie-consent'),
-                'analytics_name' => __('Analytics', 'tg-gdpr-cookie-consent'),
-                'analytics_desc' => __('Cookies that help us understand how visitors interact with our website.', 'tg-gdpr-cookie-consent'),
-                'marketing_name' => __('Marketing', 'tg-gdpr-cookie-consent'),
-                'marketing_desc' => __('Cookies used to deliver personalized advertisements.', 'tg-gdpr-cookie-consent'),
+                'necessary_name' => $this->get_category_label($settings, 'necessary', __('Necessary', 'tg-gdpr-cookie-consent')),
+                'necessary_desc' => $this->get_category_description($settings, 'necessary', __('Essential cookies required for the website to function properly. Cannot be disabled.', 'tg-gdpr-cookie-consent')),
+                'functional_name' => $this->get_category_label($settings, 'functional', __('Functional', 'tg-gdpr-cookie-consent')),
+                'functional_desc' => $this->get_category_description($settings, 'functional', __('Cookies that enable enhanced functionality and personalization.', 'tg-gdpr-cookie-consent')),
+                'analytics_name' => $this->get_category_label($settings, 'analytics', __('Analytics', 'tg-gdpr-cookie-consent')),
+                'analytics_desc' => $this->get_category_description($settings, 'analytics', __('Cookies that help us understand how visitors interact with our website.', 'tg-gdpr-cookie-consent')),
+                'marketing_name' => $this->get_category_label($settings, 'marketing', __('Marketing', 'tg-gdpr-cookie-consent')),
+                'marketing_desc' => $this->get_category_description($settings, 'marketing', __('Cookies used to deliver personalized advertisements.', 'tg-gdpr-cookie-consent')),
             ),
         );
     }
@@ -331,6 +353,12 @@ class TG_GDPR_Public {
      * This is the HEART of our performance-first, cache-compatible approach.
      */
     public function inject_critical_inline_script() {
+        $settings = $this->get_merged_settings();
+
+        if (!$this->should_enforce_consent($settings)) {
+            return;
+        }
+
         // Add inline CSS for hiding blocked scripts
         echo '<style id="tg-gdpr-hide-blocked">[data-tg-blocked]{display:none!important;}</style>';
         
@@ -526,6 +554,10 @@ class TG_GDPR_Public {
         if (is_admin()) {
             return;
         }
+
+        if (!$this->should_enforce_consent()) {
+            return;
+        }
         
         // Check if caching is active
         if ($this->script_blocker->is_page_cached()) {
@@ -551,7 +583,13 @@ class TG_GDPR_Public {
      * Render the cookie banner.
      */
     public function render_banner() {
-        $banner = new TG_GDPR_Banner();
+        $settings = $this->get_merged_settings();
+
+        if (!$this->should_enforce_consent($settings)) {
+            return;
+        }
+
+        $banner = new TG_GDPR_Banner($settings);
         
         // Inject inline styles
         echo $banner->get_inline_styles();
@@ -565,8 +603,278 @@ class TG_GDPR_Public {
      *
      * @return int
      */
-    private function get_cookie_expiry() {
-        $settings = get_option('tg_gdpr_settings', array());
-        return isset($settings['advanced']['consent_expiry']) ? (int) $settings['advanced']['consent_expiry'] : 365;
+    private function get_cookie_expiry($settings = null) {
+        $settings = is_array($settings) ? $settings : $this->get_merged_settings();
+        $behavior = $this->get_behavior_config($settings);
+
+        if (isset($behavior['consent_expiry_days'])) {
+            return (int) $behavior['consent_expiry_days'];
+        }
+
+        if (isset($settings['advanced']['consent_expiry'])) {
+            return (int) $settings['advanced']['consent_expiry'];
+        }
+
+        return 365;
+    }
+
+    /**
+     * Extract SaaS settings from API responses with either legacy or current response shapes.
+     *
+     * @param array|null $body
+     * @return array
+     */
+    private function extract_saas_settings($body) {
+        if (!is_array($body)) {
+            return array();
+        }
+
+        if (isset($body['settings']) && is_array($body['settings'])) {
+            return $body['settings'];
+        }
+
+        if (isset($body['data']) && is_array($body['data'])) {
+            if (isset($body['data']['settings']) && is_array($body['data']['settings'])) {
+                return $body['data']['settings'];
+            }
+
+            return $body['data'];
+        }
+
+        return array();
+    }
+
+    /**
+     * Get normalized banner config for either local or SaaS settings shapes.
+     *
+     * @param array $settings
+     * @return array
+     */
+    private function get_banner_config($settings) {
+        if (isset($settings['banner']) && is_array($settings['banner'])) {
+            return $settings['banner'];
+        }
+
+        if (isset($settings['appearance']) && is_array($settings['appearance'])) {
+            return $settings['appearance'];
+        }
+
+        return array();
+    }
+
+    /**
+     * Get normalized content config.
+     *
+     * @param array $settings
+     * @return array
+     */
+    private function get_content_config($settings) {
+        return isset($settings['content']) && is_array($settings['content']) ? $settings['content'] : array();
+    }
+
+    /**
+     * Get normalized behavior config.
+     *
+     * @param array $settings
+     * @return array
+     */
+    private function get_behavior_config($settings) {
+        return isset($settings['behavior']) && is_array($settings['behavior']) ? $settings['behavior'] : array();
+    }
+
+    /**
+     * Get normalized geo targeting mode.
+     *
+     * @param array $settings
+     * @return string
+     */
+    private function get_geo_targeting_mode($settings) {
+        if (isset($settings['geo_targeting_mode'])) {
+            return sanitize_key($settings['geo_targeting_mode']);
+        }
+
+        if (empty($settings['geo_targeting_enabled'])) {
+            return 'all';
+        }
+
+        $countries = isset($settings['geo_countries']) && is_array($settings['geo_countries']) ? $settings['geo_countries'] : array();
+
+        if (empty($countries) || in_array('EU', $countries, true)) {
+            return 'eu';
+        }
+
+        return 'selected';
+    }
+
+    /**
+     * Get targeted countries for geo enforcement.
+     *
+     * @param array $settings
+     * @return array
+     */
+    private function get_geo_target_countries($settings) {
+        $mode = $this->get_geo_targeting_mode($settings);
+
+        if ($mode === 'all') {
+            return array();
+        }
+
+        if ($mode === 'eu') {
+            return $this->get_supported_european_countries();
+        }
+
+        $countries = isset($settings['geo_countries']) && is_array($settings['geo_countries']) ? $settings['geo_countries'] : array();
+
+        return array_values(array_unique(array_filter(array_map('strtoupper', $countries), function($country) {
+            return in_array($country, $this->get_supported_european_countries(), true);
+        })));
+    }
+
+    /**
+     * Determine whether consent enforcement should apply for the current request.
+     *
+     * @param array|null $settings
+     * @param string|null $visitor_country
+     * @return bool
+     */
+    private function should_enforce_consent($settings = null, $visitor_country = null) {
+        $settings = is_array($settings) ? $settings : $this->get_merged_settings();
+        $mode = $this->get_geo_targeting_mode($settings);
+
+        if ($mode === 'all') {
+            return true;
+        }
+
+        $visitor_country = is_string($visitor_country) ? strtoupper($visitor_country) : $this->detect_visitor_country();
+
+        if (empty($visitor_country)) {
+            return true;
+        }
+
+        return in_array($visitor_country, $this->get_geo_target_countries($settings), true);
+    }
+
+    /**
+     * Detect the current visitor country from trusted proxy headers.
+     *
+     * @return string|null
+     */
+    private function detect_visitor_country() {
+        $header_keys = array(
+            'HTTP_CF_IPCOUNTRY',
+            'HTTP_CLOUDFRONT_VIEWER_COUNTRY',
+            'HTTP_FASTLY_COUNTRY_CODE',
+            'HTTP_X_COUNTRY_CODE',
+            'HTTP_X_COUNTRY',
+            'GEOIP_COUNTRY_CODE',
+        );
+
+        foreach ($header_keys as $key) {
+            if (empty($_SERVER[$key])) {
+                continue;
+            }
+
+            $country = strtoupper(substr(sanitize_text_field(wp_unslash($_SERVER[$key])), 0, 2));
+
+            if (preg_match('/^[A-Z]{2}$/', $country) === 1 && !in_array($country, array('XX', 'T1'), true)) {
+                return $country;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the configured GCM default state.
+     *
+     * @param array $settings
+     * @return array
+     */
+    private function get_default_gcm_state($settings) {
+        $fallback = array(
+            'ad_storage' => 'denied',
+            'analytics_storage' => 'denied',
+            'ad_user_data' => 'denied',
+            'ad_personalization' => 'denied',
+            'functionality_storage' => 'denied',
+            'personalization_storage' => 'denied',
+            'security_storage' => 'granted',
+        );
+
+        if (isset($settings['gcm']['default_state']) && is_array($settings['gcm']['default_state'])) {
+            return array_merge($fallback, $settings['gcm']['default_state']);
+        }
+
+        if (isset($settings['gcm_default_state']) && is_array($settings['gcm_default_state'])) {
+            return array_merge($fallback, $settings['gcm_default_state']);
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * Get a permissive GCM state for non-targeted regions.
+     *
+     * @return array
+     */
+    private function get_permissive_gcm_state() {
+        return array(
+            'ad_storage' => 'granted',
+            'analytics_storage' => 'granted',
+            'ad_user_data' => 'granted',
+            'ad_personalization' => 'granted',
+            'functionality_storage' => 'granted',
+            'personalization_storage' => 'granted',
+            'security_storage' => 'granted',
+        );
+    }
+
+    /**
+     * Resolve a category label for either local or SaaS settings.
+     *
+     * @param array $settings
+     * @param string $category
+     * @param string $default
+     * @return string
+     */
+    private function get_category_label($settings, $category, $default) {
+        if (isset($settings['categories'][$category]['title'])) {
+            return $settings['categories'][$category]['title'];
+        }
+
+        if (isset($settings['categories'][$category]) && is_string($settings['categories'][$category])) {
+            return $settings['categories'][$category];
+        }
+
+        return $default;
+    }
+
+    /**
+     * Resolve a category description for either local or SaaS settings.
+     *
+     * @param array $settings
+     * @param string $category
+     * @param string $default
+     * @return string
+     */
+    private function get_category_description($settings, $category, $default) {
+        if (isset($settings['categories'][$category]['description'])) {
+            return $settings['categories'][$category]['description'];
+        }
+
+        if (isset($settings['category_descriptions'][$category]) && is_string($settings['category_descriptions'][$category])) {
+            return $settings['category_descriptions'][$category];
+        }
+
+        return $default;
+    }
+
+    /**
+     * Get supported European country codes for geo targeting.
+     *
+     * @return array
+     */
+    private function get_supported_european_countries() {
+        return array('AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'GB', 'IS', 'LI', 'NO', 'CH');
     }
 }

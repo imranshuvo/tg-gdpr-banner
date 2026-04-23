@@ -80,6 +80,12 @@
      * Initialize the consent banner
      */
     function init() {
+        if (settings.consent_enforced === false) {
+            exposePublicAPI();
+            console.log('[TG GDPR] Geo targeting bypassed consent banner');
+            return;
+        }
+
         // Check for existing consent
         const existingConsent = getStoredConsent();
         

@@ -9,6 +9,16 @@
 class TG_GDPR_Auto_Scanner {
 
     /**
+     * Maximum number of URLs to inspect during a single scan.
+     */
+    private $max_scan_urls = 100;
+
+    /**
+     * Maximum number of response bytes to inspect per page.
+     */
+    private $max_response_bytes = 262144;
+
+    /**
      * License manager instance
      */
     private $license_manager;
@@ -100,9 +110,11 @@ class TG_GDPR_Auto_Scanner {
 
         foreach ($scan_urls as $scan_url) {
             $response = wp_remote_get($scan_url, array(
-                'timeout' => 15,
-                'redirection' => 3,
+                'timeout' => 8,
+                'redirection' => 2,
                 'user-agent' => 'TG GDPR Cookie Scanner/' . TG_GDPR_VERSION,
+                'limit_response_size' => $this->max_response_bytes,
+                'reject_unsafe_urls' => true,
             ));
 
             if (is_wp_error($response)) {
@@ -192,28 +204,43 @@ class TG_GDPR_Auto_Scanner {
             $urls[] = $privacy_policy_url;
         }
 
-        $page_ids = get_posts(array(
-            'post_type' => 'page',
+        $post_types = array_diff(
+            get_post_types(array('public' => true), 'names'),
+            array('attachment', 'revision', 'nav_menu_item', 'custom_css', 'customize_changeset', 'oembed_cache', 'user_request', 'wp_block', 'wp_template', 'wp_template_part', 'wp_global_styles', 'wp_navigation')
+        );
+
+        if (empty($post_types)) {
+            return array_values(array_slice(array_unique(array_filter($urls)), 0, $this->max_scan_urls));
+        }
+
+        $content_ids = get_posts(array(
+            'post_type' => $post_types,
             'post_status' => 'publish',
-            'posts_per_page' => 3,
+            'posts_per_page' => $this->max_scan_urls * 2,
             'fields' => 'ids',
-            'orderby' => 'menu_order title',
-            'order' => 'ASC',
+            'orderby' => 'modified',
+            'order' => 'DESC',
+            'no_found_rows' => true,
+            'suppress_filters' => true,
             'post__not_in' => array_filter(array(
                 (int) get_option('page_on_front'),
                 (int) get_option('wp_page_for_privacy_policy'),
             )),
         ));
 
-        foreach ($page_ids as $page_id) {
-            $permalink = get_permalink($page_id);
+        foreach ($content_ids as $content_id) {
+            if (count($urls) >= $this->max_scan_urls) {
+                break;
+            }
+
+            $permalink = get_permalink($content_id);
 
             if (!empty($permalink) && $this->is_internal_url($permalink)) {
                 $urls[] = $permalink;
             }
         }
 
-        return array_values(array_unique(array_filter($urls)));
+        return array_values(array_slice(array_unique(array_filter($urls)), 0, $this->max_scan_urls));
     }
 
     /**

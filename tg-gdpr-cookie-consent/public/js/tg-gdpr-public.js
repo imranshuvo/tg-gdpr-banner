@@ -26,6 +26,10 @@
          * Initialize
          */
         init() {
+            if (TG_GDPR.consent_enforced === false || !this.banner.length) {
+                return;
+            }
+
             // Check if user already has consent
             if (this.hasConsent()) {
                 this.showRevisitButton();

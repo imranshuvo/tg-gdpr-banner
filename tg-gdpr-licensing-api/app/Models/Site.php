@@ -10,6 +10,13 @@ use Illuminate\Support\Str;
 
 class Site extends Model
 {
+    public const EUROPEAN_COUNTRY_CODES = [
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
+        'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
+        'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'GB', 'IS', 'LI',
+        'NO', 'CH',
+    ];
+
     protected $fillable = [
         'customer_id',
         'license_id',
@@ -116,6 +123,39 @@ class Site extends Model
         $this->update(['policy_updated_at' => now()]);
     }
 
+    public function getGeoTargetingMode(): string
+    {
+        if (!$this->geo_targeting_enabled) {
+            return 'all';
+        }
+
+        $configuredCountries = array_values(array_filter($this->geo_countries ?? []));
+
+        if (empty($configuredCountries) || in_array('EU', $configuredCountries, true)) {
+            return 'eu';
+        }
+
+        return 'selected';
+    }
+
+    public function getGeoTargetCountries(): array
+    {
+        $mode = $this->getGeoTargetingMode();
+
+        if ($mode === 'all') {
+            return [];
+        }
+
+        if ($mode === 'eu') {
+            return self::EUROPEAN_COUNTRY_CODES;
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map('strtoupper', $this->geo_countries ?? []),
+            fn (string $countryCode) => in_array($countryCode, self::EUROPEAN_COUNTRY_CODES, true)
+        )));
+    }
+
     public function getSettingsForPlugin(): array
     {
         $settings = $this->settings;
@@ -126,7 +166,10 @@ class Site extends Model
             'tcf_enabled' => $this->tcf_enabled,
             'gcm_enabled' => $this->gcm_enabled,
             'geo_targeting_enabled' => $this->geo_targeting_enabled,
-            'geo_countries' => $this->geo_countries ?? ['EU'],
+            'geo_targeting_mode' => $this->getGeoTargetingMode(),
+            'geo_countries' => $this->geo_targeting_enabled
+                ? ($this->getGeoTargetingMode() === 'eu' ? ['EU'] : $this->getGeoTargetCountries())
+                : [],
             'banner' => [
                 'position' => $settings->banner_position ?? 'bottom',
                 'layout' => $settings->banner_layout ?? 'bar',

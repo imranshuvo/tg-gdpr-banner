@@ -74,9 +74,17 @@ class SiteController extends Controller
             'status' => 'required|in:active,paused,trial,expired,deleted',
             'tcf_enabled' => 'boolean',
             'gcm_enabled' => 'boolean',
-            'geo_targeting_enabled' => 'boolean',
-            'geo_countries' => 'nullable|array',
+            'geo_targeting_mode' => ['required', Rule::in(['all', 'eu', 'selected'])],
+            'geo_countries' => 'nullable|array|max:32|required_if:geo_targeting_mode,selected',
+            'geo_countries.*' => ['string', 'size:2', Rule::in(Site::EUROPEAN_COUNTRY_CODES)],
         ]);
+
+        [$validated['geo_targeting_enabled'], $validated['geo_countries']] = $this->normalizeGeoTargetingSettings(
+            $validated['geo_targeting_mode'],
+            $validated['geo_countries'] ?? []
+        );
+
+        unset($validated['geo_targeting_mode']);
         
         // Extract domain from URL if not provided
         if (empty($validated['domain'])) {
@@ -153,9 +161,17 @@ class SiteController extends Controller
             'status' => 'required|in:active,paused,trial,expired,deleted',
             'tcf_enabled' => 'boolean',
             'gcm_enabled' => 'boolean',
-            'geo_targeting_enabled' => 'boolean',
-            'geo_countries' => 'nullable|array',
+            'geo_targeting_mode' => ['required', Rule::in(['all', 'eu', 'selected'])],
+            'geo_countries' => 'nullable|array|max:32|required_if:geo_targeting_mode,selected',
+            'geo_countries.*' => ['string', 'size:2', Rule::in(Site::EUROPEAN_COUNTRY_CODES)],
         ]);
+
+        [$validated['geo_targeting_enabled'], $validated['geo_countries']] = $this->normalizeGeoTargetingSettings(
+            $validated['geo_targeting_mode'],
+            $validated['geo_countries'] ?? []
+        );
+
+        unset($validated['geo_targeting_mode']);
         
         $site->update($validated);
         
@@ -201,6 +217,10 @@ class SiteController extends Controller
     public function updateSettings(Request $request, Site $site)
     {
         $validated = $request->validate([
+            'geo_targeting_mode' => ['required', Rule::in(['all', 'eu', 'selected'])],
+            'geo_countries' => 'nullable|array|max:32|required_if:geo_targeting_mode,selected',
+            'geo_countries.*' => ['string', 'size:2', Rule::in(Site::EUROPEAN_COUNTRY_CODES)],
+
             // Banner Appearance
             'banner_position' => 'required|in:bottom,top,bottom-left,bottom-right,center',
             'banner_layout' => 'required|in:bar,box,popup',
@@ -269,6 +289,18 @@ class SiteController extends Controller
         foreach ($booleanFields as $field) {
             $validated[$field] = $request->boolean($field);
         }
+
+        [$geoTargetingEnabled, $geoCountries] = $this->normalizeGeoTargetingSettings(
+            $validated['geo_targeting_mode'],
+            $validated['geo_countries'] ?? []
+        );
+
+        $site->update([
+            'geo_targeting_enabled' => $geoTargetingEnabled,
+            'geo_countries' => $geoCountries,
+        ]);
+
+        unset($validated['geo_targeting_mode'], $validated['geo_countries']);
         
         // Update or create settings
         $site->settings()->updateOrCreate(
@@ -279,6 +311,28 @@ class SiteController extends Controller
         return redirect()
             ->route('admin.sites.settings', $site)
             ->with('success', 'Settings saved successfully.');
+    }
+
+    /**
+     * Normalize geo targeting settings to the persisted site fields.
+     *
+     * @param string $mode
+     * @param array $countries
+     * @return array{0: bool, 1: array<int, string>}
+     */
+    private function normalizeGeoTargetingSettings(string $mode, array $countries): array
+    {
+        if ($mode === 'all') {
+            return [false, []];
+        }
+
+        if ($mode === 'eu') {
+            return [true, ['EU']];
+        }
+
+        $selectedCountries = array_values(array_unique(array_map('strtoupper', $countries)));
+
+        return [true, $selectedCountries];
     }
 
     /**

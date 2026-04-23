@@ -152,6 +152,82 @@
                     </div>
                 </div>
 
+                {{-- Geo Targeting --}}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Geo Targeting</h5>
+                    </div>
+                    <div class="card-body">
+                        @php
+                            $geoMode = old('geo_targeting_mode', $site->getGeoTargetingMode());
+                            $selectedGeoCountries = old('geo_countries', $site->getGeoTargetingMode() === 'selected' ? ($site->geo_countries ?? []) : []);
+                            $availableGeoCountries = [
+                                'AT' => 'Austria',
+                                'BE' => 'Belgium',
+                                'BG' => 'Bulgaria',
+                                'HR' => 'Croatia',
+                                'CY' => 'Cyprus',
+                                'CZ' => 'Czech Republic',
+                                'DK' => 'Denmark',
+                                'EE' => 'Estonia',
+                                'FI' => 'Finland',
+                                'FR' => 'France',
+                                'DE' => 'Germany',
+                                'GR' => 'Greece',
+                                'HU' => 'Hungary',
+                                'IE' => 'Ireland',
+                                'IT' => 'Italy',
+                                'LV' => 'Latvia',
+                                'LT' => 'Lithuania',
+                                'LU' => 'Luxembourg',
+                                'MT' => 'Malta',
+                                'NL' => 'Netherlands',
+                                'PL' => 'Poland',
+                                'PT' => 'Portugal',
+                                'RO' => 'Romania',
+                                'SK' => 'Slovakia',
+                                'SI' => 'Slovenia',
+                                'ES' => 'Spain',
+                                'SE' => 'Sweden',
+                                'GB' => 'United Kingdom',
+                                'IS' => 'Iceland',
+                                'LI' => 'Liechtenstein',
+                                'NO' => 'Norway',
+                                'CH' => 'Switzerland',
+                            ];
+                        @endphp
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Banner Scope</label>
+                                <select name="geo_targeting_mode" class="form-select @error('geo_targeting_mode') is-invalid @enderror">
+                                    <option value="all" {{ $geoMode === 'all' ? 'selected' : '' }}>All countries</option>
+                                    <option value="eu" {{ $geoMode === 'eu' ? 'selected' : '' }}>EU/EEA/UK/CH only</option>
+                                    <option value="selected" {{ $geoMode === 'selected' ? 'selected' : '' }}>Selected European countries only</option>
+                                </select>
+                                @error('geo_targeting_mode')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                                <small class="text-muted">Use this to decide where the CMP banner and regional consent defaults apply.</small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Selected Countries</label>
+                                <select name="geo_countries[]" class="form-select @error('geo_countries') is-invalid @enderror @error('geo_countries.*') is-invalid @enderror" multiple size="10">
+                                    @foreach($availableGeoCountries as $code => $label)
+                                        <option value="{{ $code }}" {{ in_array($code, $selectedGeoCountries, true) ? 'selected' : '' }}>{{ $label }} ({{ $code }})</option>
+                                    @endforeach
+                                </select>
+                                @error('geo_countries')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                                @error('geo_countries.*')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                                <small class="text-muted">Only used when “Selected European countries only” is chosen.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Behavior Settings --}}
                 <div class="card mb-4">
                     <div class="card-header">
