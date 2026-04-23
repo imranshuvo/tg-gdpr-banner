@@ -184,6 +184,7 @@ class ConsentController extends Controller
             'sessions.*.consent_given' => 'required|integer|min:0',
             'sessions.*.consent_denied' => 'required|integer|min:0',
             'sessions.*.consent_customized' => 'required|integer|min:0',
+            'sessions.*.no_action' => 'nullable|integer|min:0',
             'sessions.*.accepted_functional' => 'integer|min:0',
             'sessions.*.accepted_analytics' => 'integer|min:0',
             'sessions.*.accepted_marketing' => 'integer|min:0',
@@ -192,13 +193,22 @@ class ConsentController extends Controller
         ]);
         
         foreach ($validated['sessions'] as $sessionData) {
-            SiteSession::updateOrCreate(
-                [
+            $session = SiteSession::query()
+                ->where('site_id', $site->id)
+                ->whereDate('date', $sessionData['date'])
+                ->first();
+
+            if (!$session) {
+                $session = new SiteSession([
                     'site_id' => $site->id,
                     'date' => $sessionData['date'],
-                ],
-                $sessionData
-            );
+                ]);
+            }
+
+            $session->fill($this->mergeSessionPayload($session, $sessionData));
+            $session->site_id = $site->id;
+            $session->date = $sessionData['date'];
+            $session->save();
         }
         
         // Update monthly usage
@@ -227,6 +237,56 @@ class ConsentController extends Controller
                 'limit_exceeded' => $currentMonth->limit_exceeded,
             ],
         ]);
+    }
+
+    /**
+     * Merge an incoming daily aggregate with the current stored session row.
+     */
+    private function mergeSessionPayload(SiteSession $existing, array $incoming): array
+    {
+        $counters = [
+            'total_sessions',
+            'banner_shown',
+            'consent_given',
+            'consent_denied',
+            'consent_customized',
+            'accepted_functional',
+            'accepted_analytics',
+            'accepted_marketing',
+        ];
+
+        $merged = [];
+
+        foreach ($counters as $field) {
+            $merged[$field] = max((int) ($existing->{$field} ?? 0), (int) ($incoming[$field] ?? 0));
+        }
+
+        $derivedNoAction = max(0, $merged['banner_shown'] - ($merged['consent_given'] + $merged['consent_denied'] + $merged['consent_customized']));
+        $incomingNoAction = array_key_exists('no_action', $incoming) ? (int) $incoming['no_action'] : $derivedNoAction;
+
+        $merged['no_action'] = max((int) ($existing->no_action ?? 0), $incomingNoAction, $derivedNoAction);
+        $merged['geo_breakdown'] = $this->mergeSessionBreakdown($existing->geo_breakdown, $incoming['geo_breakdown'] ?? null);
+        $merged['device_breakdown'] = $this->mergeSessionBreakdown($existing->device_breakdown, $incoming['device_breakdown'] ?? null);
+
+        return $merged;
+    }
+
+    /**
+     * Merge cumulative breakdown payloads without letting stale syncs overwrite newer counts.
+     */
+    private function mergeSessionBreakdown(?array $existing, ?array $incoming): array
+    {
+        $existing = is_array($existing) ? $existing : [];
+        $incoming = is_array($incoming) ? $incoming : [];
+        $merged = [];
+
+        foreach (array_unique(array_merge(array_keys($existing), array_keys($incoming))) as $key) {
+            $merged[$key] = max((int) ($existing[$key] ?? 0), (int) ($incoming[$key] ?? 0));
+        }
+
+        arsort($merged);
+
+        return $merged;
     }
 
     /**

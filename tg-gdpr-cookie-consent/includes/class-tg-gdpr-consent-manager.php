@@ -58,26 +58,35 @@ class TG_GDPR_Consent_Manager {
         
         // Necessary is always true
         $validated_consent['necessary'] = true;
+
+        $normalized_consent = array_merge(
+            $validated_consent,
+            array(
+                'interaction' => isset($consent['interaction']) ? sanitize_key($consent['interaction']) : '',
+                'version' => isset($consent['version']) ? absint($consent['version']) : 1,
+            )
+        );
         
         // Save consent
-        $this->save_consent($validated_consent);
+        $this->save_consent($normalized_consent);
 
         if (class_exists('TG_GDPR_API_Sync')) {
             $api_sync = TG_GDPR_API_Sync::get_instance();
 
             if ($api_sync->is_configured()) {
-                $api_sync->queue_consent($validated_consent);
+                $api_sync->record_consent_interaction($normalized_consent);
+                $api_sync->queue_consent($normalized_consent);
             }
         }
         
         // Log consent (Pro feature)
         if ($this->is_pro_active() && $this->is_consent_logging_enabled()) {
-            $this->log_consent($validated_consent);
+            $this->log_consent($normalized_consent);
         }
         
         wp_send_json_success(array(
             'message' => 'Consent saved successfully',
-            'consent' => $validated_consent
+            'consent' => $normalized_consent
         ));
     }
 

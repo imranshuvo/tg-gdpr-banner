@@ -101,11 +101,13 @@ class TG_GDPR_Core {
      */
     private function define_public_hooks() {
         $plugin_public = new TG_GDPR_Public($this->get_plugin_name(), $this->get_version());
+        $api_sync = TG_GDPR_API_Sync::get_instance();
 
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_scripts');
         $this->loader->add_action('wp_head', $plugin_public, 'inject_critical_inline_script', 0);
         $this->loader->add_action('wp_footer', $plugin_public, 'render_banner');
+        $this->loader->add_action('template_redirect', $api_sync, 'record_session', 0);
         
         // Script blocking
         $this->loader->add_action('template_redirect', $plugin_public, 'start_output_buffering', -9999);

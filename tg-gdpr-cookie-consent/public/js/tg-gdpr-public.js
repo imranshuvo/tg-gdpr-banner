@@ -103,6 +103,7 @@
         showBanner() {
             this.banner.fadeIn(300);
             this.banner.attr('aria-hidden', 'false');
+            this.trackAnalyticsEvent('banner_shown');
             
             // Trap focus
             this.trapFocus();
@@ -150,7 +151,9 @@
                 necessary: true,
                 functional: true,
                 analytics: true,
-                marketing: true
+                marketing: true,
+                interaction: 'accept_all',
+                version: TG_GDPR.policy_version || 1
             };
             
             this.saveConsent(consent);
@@ -164,7 +167,9 @@
                 necessary: true,
                 functional: false,
                 analytics: false,
-                marketing: false
+                marketing: false,
+                interaction: 'reject_all',
+                version: TG_GDPR.policy_version || 1
             };
             
             this.saveConsent(consent);
@@ -178,7 +183,9 @@
                 necessary: true, // Always true
                 functional: $('.tg-gdpr-category-checkbox[data-category="functional"]').is(':checked'),
                 analytics: $('.tg-gdpr-category-checkbox[data-category="analytics"]').is(':checked'),
-                marketing: $('.tg-gdpr-category-checkbox[data-category="marketing"]').is(':checked')
+                marketing: $('.tg-gdpr-category-checkbox[data-category="marketing"]').is(':checked'),
+                interaction: 'custom',
+                version: TG_GDPR.policy_version || 1
             };
             
             this.saveConsent(consent);
@@ -292,6 +299,34 @@
          */
         hideLoading() {
             $('.tg-gdpr-btn').prop('disabled', false).css('opacity', '1');
+        }
+
+        /**
+         * Track a lightweight analytics event.
+         * @param {string} eventName
+         */
+        trackAnalyticsEvent(eventName) {
+            if (!TG_GDPR.ajax_url || !TG_GDPR.nonce) {
+                return;
+            }
+
+            const body = new FormData();
+            body.append('action', 'tg_gdpr_track_analytics_event');
+            body.append('nonce', TG_GDPR.nonce);
+            body.append('event_name', eventName);
+
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(TG_GDPR.ajax_url, body);
+                return;
+            }
+
+            $.ajax({
+                url: TG_GDPR.ajax_url,
+                type: 'POST',
+                data: body,
+                processData: false,
+                contentType: false
+            });
         }
         
         /**

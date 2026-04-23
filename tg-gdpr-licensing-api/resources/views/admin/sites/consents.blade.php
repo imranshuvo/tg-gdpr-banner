@@ -144,20 +144,20 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @php
-                                    $badgeClass = match($consent->interaction_type) {
+                                    $badgeClass = match($consent->consent_method) {
                                         'accept_all' => 'bg-green-100 text-green-800',
                                         'reject_all' => 'bg-red-100 text-red-800',
-                                        'custom' => 'bg-blue-100 text-blue-800',
+                                        'customize' => 'bg-blue-100 text-blue-800',
                                         default => 'bg-gray-100 text-gray-800',
                                     };
                                 @endphp
                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full {{ $badgeClass }}">
-                                    {{ ucfirst(str_replace('_', ' ', $consent->interaction_type)) }}
+                                    {{ ucfirst(str_replace('_', ' ', $consent->consent_method ?? 'unknown')) }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                 @php
-                                    $consentData = $consent->consent_data;
+                                    $consentData = $consent->consent_categories;
                                     if (is_string($consentData)) {
                                         $consentData = json_decode($consentData, true);
                                     }

@@ -187,6 +187,7 @@ class TG_GDPR_Public {
                 'nonce' => wp_create_nonce('tg_gdpr_nonce'),
                 'cookie_name' => 'tg_gdpr_consent',
                 'cookie_expiry' => $this->get_cookie_expiry(),
+                'policy_version' => isset($settings['policy_version']) ? $settings['policy_version'] : '1.0',
                 'api_url' => isset($license['api_url']) ? $license['api_url'] : '',
                 'site_token' => isset($license['site_token']) ? $license['site_token'] : '',
             )
@@ -272,6 +273,8 @@ class TG_GDPR_Public {
         return array(
             'site_token' => isset($license['site_token']) ? $license['site_token'] : '',
             'api_url' => isset($license['api_url']) ? $license['api_url'] : '',
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('tg_gdpr_nonce'),
             'cookie_expiry' => $this->get_cookie_expiry(),
             'policy_version' => isset($settings['policy_version']) ? $settings['policy_version'] : '1.0',
             

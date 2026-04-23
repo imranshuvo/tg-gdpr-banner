@@ -18,6 +18,8 @@
     const settings = window.TG_GDPR_Banner_Settings || {};
     const siteToken = settings.site_token || '';
     const apiUrl = settings.api_url || '';
+    const analyticsAjaxUrl = settings.ajax_url || '';
+    const analyticsNonce = settings.nonce || '';
     
     // Cookie settings
     const COOKIE_NAME = 'tg_gdpr_consent';
@@ -265,6 +267,7 @@
 
         // Dispatch event
         dispatchEvent('tg_gdpr_banner_shown', {});
+        trackAnalyticsEvent('banner_shown');
     }
 
     /**
@@ -616,6 +619,8 @@
             window.TG_GDPR_GCM.update(consent);
         }
 
+        trackAnalyticsEvent('consent_saved', consent);
+
         // Sync with API (async, non-blocking)
         syncConsentToAPI(consent);
 
@@ -716,6 +721,8 @@
             },
             consent_method: normalizeConsentMethod(consent.interaction),
             policy_version: normalizePolicyVersion(consent.version),
+            device_type: detectDeviceType(window.navigator?.userAgent || ''),
+            browser: detectBrowser(window.navigator?.userAgent || ''),
         };
 
         // Use sendBeacon for reliability (won't block page unload)
@@ -754,6 +761,77 @@
         setCookie(VISITOR_HASH_COOKIE, generated, COOKIE_DAYS);
 
         return generated;
+    }
+
+    /**
+     * Track a lightweight analytics event in WordPress.
+     * @param {string} eventName
+     * @param {Object|null} consent
+     */
+    function trackAnalyticsEvent(eventName, consent = null) {
+        if (!analyticsAjaxUrl || !analyticsNonce) {
+            return;
+        }
+
+        const body = new FormData();
+        body.append('action', 'tg_gdpr_track_analytics_event');
+        body.append('nonce', analyticsNonce);
+        body.append('event_name', eventName);
+
+        if (consent) {
+            body.append('consent', JSON.stringify(consent));
+        }
+
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(analyticsAjaxUrl, body);
+            return;
+        }
+
+        fetch(analyticsAjaxUrl, {
+            method: 'POST',
+            body,
+            credentials: 'same-origin',
+            keepalive: true,
+        }).catch(() => {
+            // Ignore analytics tracking failures.
+        });
+    }
+
+    /**
+     * Detect device type from user agent.
+     * @param {string} userAgent
+     * @returns {string}
+     */
+    function detectDeviceType(userAgent) {
+        if (/tablet|ipad|kindle|playbook/i.test(userAgent)) {
+            return 'tablet';
+        }
+
+        if (/mobile|android|iphone|ipod|blackberry|windows phone/i.test(userAgent)) {
+            return 'mobile';
+        }
+
+        if (/mozilla|chrome|safari|firefox|edge|opera/i.test(userAgent)) {
+            return 'desktop';
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Detect browser from user agent.
+     * @param {string} userAgent
+     * @returns {string|null}
+     */
+    function detectBrowser(userAgent) {
+        if (/edg/i.test(userAgent)) return 'Edge';
+        if (/chrome/i.test(userAgent)) return 'Chrome';
+        if (/safari/i.test(userAgent)) return 'Safari';
+        if (/firefox/i.test(userAgent)) return 'Firefox';
+        if (/opera|opr/i.test(userAgent)) return 'Opera';
+        if (/msie|trident/i.test(userAgent)) return 'IE';
+
+        return null;
     }
 
     /**
