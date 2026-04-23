@@ -165,4 +165,27 @@ class TG_GDPR_Admin {
         
         include TG_GDPR_PLUGIN_DIR . 'admin/partials/tg-gdpr-license-display.php';
     }
+
+    /**
+     * Run a manual cookie scan from the admin area.
+     */
+    public function run_cookie_scan() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have permission to run a cookie scan.', 'tg-gdpr-cookie-consent'));
+        }
+
+        check_admin_referer('tg_gdpr_run_cookie_scan');
+
+        $scanner = new TG_GDPR_Auto_Scanner();
+        $result = $scanner->scan_site(true);
+
+        $redirect_args = array(
+            'page' => 'tg-gdpr-cookies',
+            'scan_status' => !empty($result['success']) ? 'success' : 'error',
+            'scan_message' => rawurlencode($result['message'] ?? __('Cookie scan completed.', 'tg-gdpr-cookie-consent')),
+        );
+
+        wp_safe_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
+        exit;
+    }
 }

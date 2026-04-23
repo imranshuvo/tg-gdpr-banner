@@ -10,6 +10,8 @@ if (!defined('ABSPATH')) {
 }
 
 $settings = get_option('tg_gdpr_settings', array());
+$license_manager = new TG_GDPR_License_Manager();
+$is_pro_active = $license_manager->is_license_active();
 
 // Handle form submission
 if (isset($_POST['tg_gdpr_save_settings']) && check_admin_referer('tg_gdpr_settings_nonce')) {
@@ -108,7 +110,7 @@ if (isset($_POST['tg_gdpr_save_settings']) && check_admin_referer('tg_gdpr_setti
                 <p class="description"><?php _e('Enter your Pro license key to unlock advanced features.', 'tg-gdpr-cookie-consent'); ?> <a href="https://techgenesis.com/tg-gdpr-pro/" target="_blank"><?php _e('Get Pro', 'tg-gdpr-cookie-consent'); ?></a></p>
             </div>
             
-            <?php if (isset($settings['pro']['license_status']) && $settings['pro']['license_status'] === 'active') : ?>
+            <?php if ($is_pro_active) : ?>
                 <div class="tg-gdpr-notice success">
                     <p><strong><?php _e('✓ Pro License Active', 'tg-gdpr-cookie-consent'); ?></strong></p>
                 </div>

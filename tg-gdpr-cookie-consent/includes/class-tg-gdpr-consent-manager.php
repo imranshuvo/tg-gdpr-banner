@@ -282,8 +282,9 @@ class TG_GDPR_Consent_Manager {
      * @return bool
      */
     private function is_pro_active() {
-        $settings = get_option('tg_gdpr_settings', array());
-        return isset($settings['pro']['license_status']) && $settings['pro']['license_status'] === 'active';
+        $license_manager = new TG_GDPR_License_Manager();
+
+        return $license_manager->is_license_active();
     }
 
     /**

@@ -42,6 +42,7 @@ class TG_GDPR_Core {
         $this->set_locale();
         $this->define_admin_hooks();
         $this->define_public_hooks();
+        $this->define_scanner_hooks();
     }
 
     /**
@@ -65,6 +66,7 @@ class TG_GDPR_Core {
         require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-script-blocker.php';
         require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-consent-manager.php';
         require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-cookie-manager.php';
+        require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-auto-scanner.php';
         require_once TG_GDPR_PLUGIN_DIR . 'includes/class-tg-gdpr-license-manager.php';
         
         // SaaS API sync handler
@@ -91,6 +93,7 @@ class TG_GDPR_Core {
         $this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts');
         $this->loader->add_action('admin_menu', $plugin_admin, 'add_admin_menu');
         $this->loader->add_action('admin_init', $plugin_admin, 'register_settings');
+        $this->loader->add_action('admin_post_tg_gdpr_run_cookie_scan', $plugin_admin, 'run_cookie_scan');
     }
 
     /**
@@ -106,6 +109,16 @@ class TG_GDPR_Core {
         
         // Script blocking
         $this->loader->add_action('template_redirect', $plugin_public, 'start_output_buffering', -9999);
+    }
+
+    /**
+     * Register auto-scanner hooks.
+     */
+    private function define_scanner_hooks() {
+        $scanner = new TG_GDPR_Auto_Scanner();
+
+        $this->loader->add_action('init', $scanner, 'maybe_schedule_auto_scan', 20);
+        $this->loader->add_action('tg_gdpr_auto_cookie_scan', $scanner, 'run_auto_scan');
     }
 
     /**
