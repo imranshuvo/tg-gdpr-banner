@@ -106,7 +106,10 @@ class TG_GDPR_Core {
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_scripts');
         $this->loader->add_action('wp_head', $plugin_public, 'inject_critical_inline_script', 0);
-        $this->loader->add_action('wp_footer', $plugin_public, 'render_banner');
+        // Modern banner.js builds its own DOM at runtime — no server-side render
+        // to avoid double-banner. Legacy `render_banner` callsite kept on the
+        // class for backward-compat but no longer wired to wp_footer.
+        // See public/js/tg-gdpr-banner.js.
         $this->loader->add_action('template_redirect', $api_sync, 'record_session', 0);
         
         // Script blocking
@@ -121,6 +124,10 @@ class TG_GDPR_Core {
 
         $this->loader->add_action('init', $scanner, 'maybe_schedule_auto_scan', 20);
         $this->loader->add_action('tg_gdpr_auto_cookie_scan', $scanner, 'run_auto_scan');
+
+        // Polite-mode tick: each fires processes ONE URL from the scan queue
+        // and schedules the next tick. See TG_GDPR_Auto_Scanner::process_scan_tick.
+        $this->loader->add_action(TG_GDPR_Auto_Scanner::TICK_HOOK, $scanner, 'process_scan_tick');
     }
 
     /**

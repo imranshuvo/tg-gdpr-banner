@@ -15,3 +15,7 @@ Schedule::command('licenses:monitor --send-alerts')->dailyAt('09:00');
 Schedule::command('model:prune', [
     '--model' => [\App\Models\ActivityLog::class],
 ])->daily();
+
+// Enforce consent-record retention policy (privacy-policy claim: "auto-deleted
+// after 36 months"). Per-record deadline is consent_records.expires_at.
+Schedule::command('consents:purge-expired')->dailyAt('03:00');

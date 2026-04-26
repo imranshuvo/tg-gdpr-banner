@@ -55,7 +55,18 @@ class TG_GDPR_Auto_Scanner {
     }
 
     /**
-     * Scan site for cookies
+     * Polite-mode option keys + cron hook.
+     *
+     * The scanner is async: kickoff enqueues URLs, a wp-cron tick processes
+     * one URL at a time with a configurable interval (default 60s) + jitter so
+     * the customer's site (and its CDN/origin) never sees a burst.
+     */
+    const STATE_OPTION = 'tg_gdpr_scan_state';
+    const TICK_HOOK    = 'tg_gdpr_scan_tick';
+
+    /**
+     * Kick off a scan. Returns immediately; the actual work happens via
+     * wp-cron ticks (one URL per interval). Use get_scan_progress() to poll.
      */
     public function scan_site($force = false) {
         if (!$this->is_available()) {
@@ -72,73 +83,286 @@ class TG_GDPR_Auto_Scanner {
             );
         }
 
+        if ($this->is_scan_in_progress()) {
+            return array(
+                'success' => false,
+                'message' => 'A scan is already in progress. Cancel it before starting a new one.',
+                'data'    => $this->get_scan_progress(),
+            );
+        }
+
         $scan_urls = $this->get_scan_urls();
-        $scan_report = $this->detect_cookies($scan_urls);
-        $cookies = $scan_report['cookies'];
+        if (empty($scan_urls)) {
+            return array(
+                'success' => false,
+                'message' => 'No URLs available to scan.',
+            );
+        }
+
+        // Fetch robots.txt once at the start; cache for the lifetime of this scan.
+        $robots_rules = $this->fetch_robots_disallow_rules();
+
+        update_option(self::STATE_OPTION, array(
+            'status'       => 'running',
+            'queue'        => array_values($scan_urls),
+            'total_urls'   => count($scan_urls),
+            'started_at'   => current_time('timestamp'),
+            'detected'     => array(),
+            'errors'       => array(),
+            'robots_rules' => $robots_rules,
+        ), false);
+
+        // First tick a few seconds out so the admin redirect completes cleanly.
+        wp_schedule_single_event(time() + 5, self::TICK_HOOK);
+
+        $eta_minutes = (int) ceil(count($scan_urls) * $this->get_scan_interval() / 60);
+
+        return array(
+            'success' => true,
+            'message' => sprintf(
+                'Scan started: %d page(s) queued. Pages will be fetched every %ds (~%d min total).',
+                count($scan_urls),
+                $this->get_scan_interval(),
+                $eta_minutes
+            ),
+            'data' => $this->get_scan_progress(),
+        );
+    }
+
+    /**
+     * Process exactly ONE URL from the queue, then schedule the next tick.
+     * Hooked to the `tg_gdpr_scan_tick` cron action.
+     */
+    public function process_scan_tick() {
+        $state = get_option(self::STATE_OPTION, null);
+        if (!is_array($state) || ($state['status'] ?? '') !== 'running') {
+            return;
+        }
+
+        if (empty($state['queue'])) {
+            $this->complete_scan($state);
+            return;
+        }
+
+        $url = array_shift($state['queue']);
+
+        $detected = $state['detected'];
+        $errors   = $state['errors'];
+        $this->fetch_one_url($url, $detected, $errors, $state['robots_rules']);
+        $state['detected'] = $detected;
+        $state['errors']   = $errors;
+
+        update_option(self::STATE_OPTION, $state, false);
+
+        if (empty($state['queue'])) {
+            $this->complete_scan($state);
+            return;
+        }
+
+        // Stagger: interval + ±jitter so two concurrent scans on different sites
+        // don't lock-step and look like a coordinated crawl.
+        $interval = $this->get_scan_interval();
+        $jitter   = $this->get_scan_jitter();
+        $next_in  = $interval + ($jitter > 0 ? random_int(-$jitter, $jitter) : 0);
+        wp_schedule_single_event(time() + max(5, $next_in), self::TICK_HOOK);
+    }
+
+    /**
+     * Fetch a single URL, detect cookies, and accumulate into the running state.
+     */
+    private function fetch_one_url($scan_url, array &$detected, array &$errors, array $robots_rules) {
+        if ($this->is_disallowed_by_robots($scan_url, $robots_rules)) {
+            $errors[] = sprintf('%s: skipped (robots.txt Disallow)', $scan_url);
+            return;
+        }
+
+        $response = wp_remote_get($scan_url, array(
+            'timeout'             => 8,
+            'redirection'         => 2,
+            'user-agent'          => 'TG GDPR Cookie Scanner/' . TG_GDPR_VERSION . ' (+https://cookiely.site/scanner)',
+            'limit_response_size' => $this->max_response_bytes,
+            'reject_unsafe_urls'  => true,
+        ));
+
+        if (is_wp_error($response)) {
+            $errors[] = sprintf('%s: %s', $scan_url, $response->get_error_message());
+            return;
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        if (empty($body)) {
+            return;
+        }
+
+        $domain = wp_parse_url($scan_url, PHP_URL_HOST);
+        $this->detect_from_stored_patterns($body, $domain, $detected);
+        $this->detect_from_known_trackers($body, $domain, $detected);
+        $this->detect_from_inline_cookie_writes($body, $domain, $detected);
+    }
+
+    /**
+     * Final pass after the queue empties: persist detected cookies, write the
+     * report, fire the `tg_gdpr_scan_completed` action so other components
+     * (auto-categorize, auto-block-rule generation) can hook in.
+     */
+    private function complete_scan(array $state) {
+        $cookies     = array_values($state['detected']);
         $saved_count = $this->persist_detected_cookies($cookies);
+        $duration    = current_time('timestamp') - (int) $state['started_at'];
 
         $report = array(
-            'scanned_at' => current_time('timestamp'),
-            'scanned_urls' => $scan_urls,
-            'cookies_found' => count($cookies),
-            'cookies_saved' => $saved_count,
-            'errors' => $scan_report['errors'],
+            'scanned_at'       => current_time('timestamp'),
+            'urls_scanned'     => (int) $state['total_urls'],
+            'cookies_found'    => count($cookies),
+            'cookies_saved'    => $saved_count,
+            'errors'           => $state['errors'],
+            'duration_seconds' => $duration,
+            // Detected cookies (with name/category/script_pattern) are needed
+            // by the runtime auto-blocker so customer-specific trackers get
+            // blocked even when they aren't on our universal pattern list.
+            'cookies'          => $cookies,
         );
 
         update_option('tg_gdpr_last_cookie_scan', $report['scanned_at']);
         update_option('tg_gdpr_last_cookie_scan_report', $report, false);
 
+        delete_option(self::STATE_OPTION);
+        wp_clear_scheduled_hook(self::TICK_HOOK);
+
+        /**
+         * Fired when a scan finishes. Listeners receive the array of detected
+         * cookies and can react (e.g. categorize them against CookieDefinitions,
+         * auto-generate block rules).
+         */
+        do_action('tg_gdpr_scan_completed', $cookies, $report);
+    }
+
+    public function is_scan_in_progress() {
+        $state = get_option(self::STATE_OPTION, null);
+        return is_array($state) && ($state['status'] ?? '') === 'running';
+    }
+
+    public function get_scan_progress() {
+        $state = get_option(self::STATE_OPTION, null);
+        if (!is_array($state) || ($state['status'] ?? '') !== 'running') {
+            return null;
+        }
+        $total     = (int) $state['total_urls'];
+        $remaining = count($state['queue']);
         return array(
-            'success' => true,
-            'message' => count($cookies) > 0 ? 'Scan completed successfully.' : 'Scan completed, but no new cookies were detected.',
-            'data' => array(
-                'cookies_found' => count($cookies),
-                'cookies_saved' => $saved_count,
-                'cookies' => $cookies,
-                'errors' => $scan_report['errors'],
-                'scanned_urls' => $scan_urls,
-            ),
+            'total'           => $total,
+            'remaining'       => $remaining,
+            'scanned'         => $total - $remaining,
+            'started_at'      => (int) $state['started_at'],
+            'detected_so_far' => count($state['detected']),
+            'eta_seconds'     => $remaining * $this->get_scan_interval(),
         );
+    }
+
+    public function cancel_scan() {
+        if (!$this->is_scan_in_progress()) {
+            return false;
+        }
+        delete_option(self::STATE_OPTION);
+        wp_clear_scheduled_hook(self::TICK_HOOK);
+        return true;
+    }
+
+    private function get_scan_interval() {
+        $settings = get_option('tg_gdpr_settings', array());
+        $secs = isset($settings['scanner']['interval_seconds'])
+            ? (int) $settings['scanner']['interval_seconds']
+            : 60;
+        // Floor at 5s — anything smaller defeats the polite-mode purpose.
+        return max(5, $secs);
+    }
+
+    private function get_scan_jitter() {
+        $settings = get_option('tg_gdpr_settings', array());
+        $secs = isset($settings['scanner']['jitter_seconds'])
+            ? (int) $settings['scanner']['jitter_seconds']
+            : 15;
+        return max(0, $secs);
     }
 
     /**
-     * Detect cookies on the site (Pro implementation)
+     * Fetch and parse the site's /robots.txt into a list of Disallow path
+     * prefixes that apply to our crawler ("*" or our identifying UA).
+     *
+     * Result is small (paths only), no UA caching across scans — robots.txt
+     * is fetched once per scan run, never per URL.
+     *
+     * @return string[]
      */
-    private function detect_cookies($scan_urls) {
-        $detected = array();
-        $errors = array();
+    private function fetch_robots_disallow_rules() {
+        $response = wp_remote_get(home_url('/robots.txt'), array(
+            'timeout' => 5,
+            'redirection' => 2,
+            'limit_response_size' => 32768, // 32 KB cap on robots.txt
+            'reject_unsafe_urls' => true,
+        ));
 
-        foreach ($scan_urls as $scan_url) {
-            $response = wp_remote_get($scan_url, array(
-                'timeout' => 8,
-                'redirection' => 2,
-                'user-agent' => 'TG GDPR Cookie Scanner/' . TG_GDPR_VERSION,
-                'limit_response_size' => $this->max_response_bytes,
-                'reject_unsafe_urls' => true,
-            ));
-
-            if (is_wp_error($response)) {
-                $errors[] = sprintf('%s: %s', $scan_url, $response->get_error_message());
-                continue;
-            }
-
-            $body = wp_remote_retrieve_body($response);
-            if (empty($body)) {
-                continue;
-            }
-
-            $domain = wp_parse_url($scan_url, PHP_URL_HOST);
-
-            $this->detect_from_stored_patterns($body, $domain, $detected);
-            $this->detect_from_known_trackers($body, $domain, $detected);
-            $this->detect_from_inline_cookie_writes($body, $domain, $detected);
+        if (is_wp_error($response) || (int) wp_remote_retrieve_response_code($response) !== 200) {
+            return array();
         }
 
-        return array(
-            'cookies' => array_values($detected),
-            'errors' => $errors,
-        );
+        $body = wp_remote_retrieve_body($response);
+        if (empty($body)) {
+            return array();
+        }
+
+        $rules    = array();
+        $applies  = false;
+        foreach (preg_split('/\r?\n/', $body) as $line) {
+            $line = trim(preg_replace('/#.*$/', '', $line));
+            if ($line === '') {
+                continue;
+            }
+
+            if (preg_match('/^User-agent:\s*(.+)$/i', $line, $m)) {
+                $ua      = strtolower(trim($m[1]));
+                $applies = ($ua === '*'
+                    || strpos($ua, 'tg gdpr') !== false
+                    || strpos($ua, 'cookiely') !== false);
+                continue;
+            }
+
+            if ($applies && preg_match('/^Disallow:\s*(.*)$/i', $line, $m)) {
+                $rule = trim($m[1]);
+                if ($rule !== '') {
+                    $rules[] = $rule;
+                }
+            }
+        }
+
+        return $rules;
     }
+
+    /**
+     * Path-prefix match against the parsed robots.txt rules.
+     */
+    private function is_disallowed_by_robots($url, array $rules) {
+        if (empty($rules)) {
+            return false;
+        }
+
+        $path = wp_parse_url($url, PHP_URL_PATH);
+        if (! is_string($path) || $path === '') {
+            $path = '/';
+        }
+
+        foreach ($rules as $rule) {
+            // Prefix match (RFC-style); does not implement wildcard `*` — sufficient for MVP.
+            if (strpos($path, $rule) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // detect_cookies($scan_urls) was the old synchronous batch method.
+    // Replaced by polite-mode: scan_site() → process_scan_tick() → fetch_one_url().
 
     /**
      * Get scanner status

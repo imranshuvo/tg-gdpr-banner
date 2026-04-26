@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DsarRequest;
 use App\Models\ConsentRecord;
 use App\Models\Site;
+use App\Services\Logging\ActivityLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -204,11 +205,34 @@ class DsarController extends Controller
     }
 
     /**
-     * Process erasure request
+     * Process erasure request — Article 17 ("right to be forgotten").
+     *
+     * Counts before/after so we have a verifiable audit trail of what was
+     * deleted, then logs the operation via ActivityLogger so Article 30
+     * (records of processing) is satisfied. The Activity row records the
+     * acting user, count, visitor_hash, and DSAR id.
      */
     private function processErasure(DsarRequest $dsarRequest): void
     {
-        $this->scopedConsentRecordsQuery($dsarRequest)->delete();
+        $query = $this->scopedConsentRecordsQuery($dsarRequest);
+        $count = $query->count();
+
+        if ($count > 0) {
+            $query->delete();
+        }
+
+        app(ActivityLogger::class)->log(
+            description: "DSAR erasure executed: {$count} consent record(s) deleted",
+            subject:     $dsarRequest,
+            properties:  [
+                'visitor_hash'    => $dsarRequest->visitor_hash,
+                'records_deleted' => $count,
+                'site_id'         => $dsarRequest->site_id,
+                'request_type'    => $dsarRequest->request_type,
+            ],
+            event:   'dsar.erased',
+            logName: 'dsar',
+        );
     }
 
     /**

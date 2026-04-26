@@ -25,6 +25,10 @@
 
     // Get settings from localized script
     const settings = window.TG_GDPR_GCM_Settings || {};
+
+    // Debug-flag-gated console helpers; default no-op for production sites.
+    const log  = settings.debug ? console.log.bind(console)  : function () {};
+    const warn = settings.debug ? console.warn.bind(console) : function () {};
     const defaultState = settings.default_state || {
         'ad_storage': 'denied',
         'analytics_storage': 'denied',
@@ -64,7 +68,7 @@
         // Enable ads data redaction when consent is denied
         gtag('set', 'ads_data_redaction', true);
 
-        console.log('[TG GDPR] Google Consent Mode v2 initialized with default state:', defaultState);
+        log('[TG GDPR] Google Consent Mode v2 initialized with default state:', defaultState);
     }
 
     /**
@@ -73,7 +77,7 @@
      */
     function updateConsentState(consent) {
         if (!consent || typeof consent !== 'object') {
-            console.warn('[TG GDPR] Invalid consent object provided');
+            warn('[TG GDPR] Invalid consent object provided');
             return;
         }
 
@@ -81,7 +85,7 @@
 
         gtag('consent', 'update', gcmState);
 
-        console.log('[TG GDPR] Google Consent Mode updated:', gcmState);
+        log('[TG GDPR] Google Consent Mode updated:', gcmState);
 
         // Dispatch event for other scripts to listen
         window.dispatchEvent(new CustomEvent('tg_gdpr_gcm_updated', {
@@ -136,7 +140,7 @@
                 const consent = JSON.parse(consentCookie);
                 return mapConsentToGCM(consent);
             } catch (e) {
-                console.warn('[TG GDPR] Failed to parse consent cookie');
+                warn('[TG GDPR] Failed to parse consent cookie');
             }
         }
         
@@ -175,7 +179,7 @@
             const consent = JSON.parse(consentCookie);
             updateConsentState(consent);
         } catch (e) {
-            console.warn('[TG GDPR] Failed to parse existing consent');
+            warn('[TG GDPR] Failed to parse existing consent');
         }
     }
 
@@ -248,6 +252,6 @@
         }
     });
 
-    console.log('[TG GDPR] Google Consent Mode v2 module loaded');
+    log('[TG GDPR] Google Consent Mode v2 module loaded');
 
 })();

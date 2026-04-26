@@ -18,6 +18,12 @@
     const settings = window.TG_GDPR_Banner_Settings || {};
     const siteToken = settings.site_token || '';
     const apiUrl = settings.api_url || '';
+
+    // Debug-flag-gated console helpers. Default to no-op so production sites
+    // don't get console noise on every page load. Flip settings.debug = true
+    // in the localized config to enable.
+    const log  = settings.debug ? console.log.bind(console)  : function () {};
+    const warn = settings.debug ? console.warn.bind(console) : function () {};
     const analyticsAjaxUrl = settings.ajax_url || '';
     const analyticsNonce = settings.nonce || '';
     
@@ -82,7 +88,7 @@
     function init() {
         if (settings.consent_enforced === false) {
             exposePublicAPI();
-            console.log('[TG GDPR] Geo targeting bypassed consent banner');
+            log('[TG GDPR] Geo targeting bypassed consent banner');
             return;
         }
 
@@ -94,12 +100,12 @@
             
             // Check if consent version is outdated
             if (existingConsent.version !== COOKIE_VERSION) {
-                console.log('[TG GDPR] Consent version outdated, showing banner');
+                log('[TG GDPR] Consent version outdated, showing banner');
                 showBanner();
             } else {
                 // Apply existing consent
                 applyConsent(currentConsent);
-                console.log('[TG GDPR] Existing consent applied');
+                log('[TG GDPR] Existing consent applied');
             }
         } else {
             // No consent - show banner
@@ -112,7 +118,7 @@
         // Listen for settings icon clicks
         setupSettingsButton();
 
-        console.log('[TG GDPR] Banner initialized');
+        log('[TG GDPR] Banner initialized');
     }
 
     /**
@@ -126,7 +132,7 @@
         try {
             return JSON.parse(cookie);
         } catch (e) {
-            console.warn('[TG GDPR] Failed to parse consent cookie');
+            warn('[TG GDPR] Failed to parse consent cookie');
             return null;
         }
     }
@@ -643,7 +649,7 @@
         // Sync with API (async, non-blocking)
         syncConsentToAPI(consent);
 
-        console.log('[TG GDPR] Consent saved:', consent);
+        log('[TG GDPR] Consent saved:', consent);
     }
 
     /**
@@ -701,7 +707,7 @@
                 // Replace original
                 script.parentNode.replaceChild(enabledScript, script);
                 
-                console.log('[TG GDPR] Enabled script for category:', category);
+                log('[TG GDPR] Enabled script for category:', category);
             }
         });
 
@@ -712,7 +718,7 @@
             if (consent[category] && iframe.dataset.src) {
                 iframe.src = iframe.dataset.src;
                 iframe.removeAttribute('data-src');
-                console.log('[TG GDPR] Enabled iframe for category:', category);
+                log('[TG GDPR] Enabled iframe for category:', category);
             }
         });
     }
@@ -723,7 +729,7 @@
      */
     function syncConsentToAPI(consent) {
         if (!apiUrl || !siteToken) {
-            console.log('[TG GDPR] API sync skipped - no API configured');
+            log('[TG GDPR] API sync skipped - no API configured');
             return;
         }
 
@@ -760,7 +766,7 @@
                 body: JSON.stringify(payload),
                 keepalive: true
             }).catch(err => {
-                console.warn('[TG GDPR] API sync failed:', err);
+                warn('[TG GDPR] API sync failed:', err);
             });
         }
     }

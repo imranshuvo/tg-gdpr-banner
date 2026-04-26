@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Consent\ConsentSigner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
@@ -31,6 +32,8 @@ class ConsentRecord extends Model
         'withdrawal_reason',
         'synced_from_plugin',
         'plugin_created_at',
+        // signature + signed_at are NOT mass-assignable — they're set by the
+        // creating-event hook from canonicalized data, never by the request.
     ];
 
     protected $casts = [
@@ -43,17 +46,35 @@ class ConsentRecord extends Model
         'expires_at' => 'datetime',
         'withdrawn_at' => 'datetime',
         'plugin_created_at' => 'datetime',
+        'signed_at' => 'datetime',
     ];
 
     protected static function boot()
     {
         parent::boot();
-        
-        static::creating(function ($record) {
+
+        static::creating(function (ConsentRecord $record) {
             if (empty($record->consent_id)) {
                 $record->consent_id = Str::uuid();
             }
+
+            // Sign the record before insert so signature + signed_at land in the
+            // same INSERT — no two-write race window where an unsigned record
+            // is briefly visible to readers.
+            $signed = ConsentSigner::sign($record);
+            $record->signature = $signed['signature'];
+            $record->signed_at = $signed['signed_at'];
         });
+    }
+
+    /**
+     * Cryptographic verification: is this record's HMAC signature still valid
+     * given the current contents and signing key? False if the row was
+     * tampered with, or if it pre-dates signing.
+     */
+    public function isSignatureValid(): bool
+    {
+        return ConsentSigner::verify($this);
     }
 
     public function site(): BelongsTo

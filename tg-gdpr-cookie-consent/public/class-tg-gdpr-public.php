@@ -113,19 +113,14 @@ class TG_GDPR_Public {
      * Register the stylesheets for the public-facing side of the site.
      */
     public function enqueue_styles() {
-        // Load new enhanced banner CSS
+        // Modern banner CSS (BEM selectors matching the runtime DOM that
+        // banner.js builds via createElement). The legacy `tg-gdpr-public.css`
+        // styled the server-rendered partial that we no longer emit, so it's
+        // intentionally not enqueued — saves ~2.5 KB gzipped per pageview.
         wp_enqueue_style(
             $this->plugin_name . '-banner',
             TG_GDPR_PLUGIN_URL . 'public/css/tg-gdpr-banner.css',
             array(),
-            $this->version,
-            'all'
-        );
-
-        wp_enqueue_style(
-            $this->plugin_name,
-            TG_GDPR_PLUGIN_URL . 'public/css/tg-gdpr-public.css',
-            array($this->plugin_name . '-banner'),
             $this->version,
             'all'
         );
@@ -171,30 +166,11 @@ class TG_GDPR_Public {
             $this->get_banner_settings($settings)
         );
 
-        // 3. Legacy script for backward compatibility
-        wp_enqueue_script(
-            $this->plugin_name,
-            TG_GDPR_PLUGIN_URL . 'public/js/tg-gdpr-public.js',
-            array($this->plugin_name . '-banner'),
-            $this->version,
-            true
-        );
-        
-        // Legacy localization
-        wp_localize_script(
-            $this->plugin_name,
-            'TG_GDPR',
-            array(
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('tg_gdpr_nonce'),
-                'cookie_name' => 'tg_gdpr_consent',
-                'cookie_expiry' => $this->get_cookie_expiry($settings),
-                'policy_version' => isset($settings['policy_version']) ? $settings['policy_version'] : '1.0',
-                'api_url' => isset($license['api_url']) ? $license['api_url'] : '',
-                'site_token' => isset($license['site_token']) ? $license['site_token'] : '',
-                'consent_enforced' => $this->should_enforce_consent($settings),
-            )
-        );
+        // Legacy public.js (jQuery-based) was previously enqueued here for
+        // backward compatibility, but it duplicated banner.js's UI and consent
+        // flow against the now-removed server-rendered banner partial. Removed
+        // to drop ~3 KB gzipped + the jQuery dependency. The TG_GDPR global is
+        // now exported by banner.js itself (window.TG_GDPR — see exposePublicAPI).
     }
 
     /**
@@ -361,7 +337,36 @@ class TG_GDPR_Public {
 
         // Add inline CSS for hiding blocked scripts
         echo '<style id="tg-gdpr-hide-blocked">[data-tg-blocked]{display:none!important;}</style>';
-        
+
+        // ─── GCM v2 default-deny bootstrap (wp_head priority 0) ───────────────
+        // This MUST run before any Google tag (gtag.js, GTM) so they queue
+        // commands against a denied state until the visitor decides. The full
+        // gcm.js script (enqueued at default priority) takes over from here for
+        // region rules and consent updates. ~400 bytes, no network.
+        if ($this->is_gcm_enabled($settings)) {
+            $existing = isset($_COOKIE['tg_gdpr_consent']) ? $_COOKIE['tg_gdpr_consent'] : '';
+            // If the visitor already has a consent cookie, we let gcm.js push the
+            // 'update' state from JS — server-side we always emit deny-defaults.
+            ?>
+            <script id="tg-gdpr-gcm-bootstrap">
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('consent', 'default', {
+                'ad_storage':'denied',
+                'ad_user_data':'denied',
+                'ad_personalization':'denied',
+                'analytics_storage':'denied',
+                'functionality_storage':'denied',
+                'personalization_storage':'denied',
+                'security_storage':'granted',
+                'wait_for_update': 500
+            });
+            gtag('set','ads_data_redaction', true);
+            gtag('set','url_passthrough', true);
+            </script>
+            <?php
+        }
+
         // Inject critical JavaScript
         ?>
         <script id="tg-gdpr-critical">
@@ -385,27 +390,22 @@ class TG_GDPR_Public {
                 }
             })();
             
-            // Script blocking patterns
-            var patterns = {
-                analytics: [
-                    'google-analytics.com', 'googletagmanager.com', 'gtag', 'ga(',
-                    'matomo', 'plausible'
-                ],
-                marketing: [
-                    'facebook.net', 'fbevents', 'fbq(', 'doubleclick',
-                    'ads-twitter', 'bat.bing'
-                ],
-                functional: [
-                    'maps.googleapis.com', 'youtube.com/iframe', 'recaptcha'
-                ]
-            };
-            
+            // Script blocking patterns. The base list is the universally-known
+            // tracker fingerprints; the auto-scanner appends per-site script_patterns
+            // to this object so customer-specific scripts are caught too.
+            var patterns = <?php echo wp_json_encode($this->build_blocker_patterns()); ?>;
+
             /**
-             * Detect script category by content/src
+             * Detect script category by content/src.
+             * IMPORTANT: unknown scripts default to 'marketing' (block-by-default),
+             * NOT 'necessary'. Customers can mark specific scripts as necessary
+             * via the admin Cookies page if they need to. This is the regulator-
+             * safe default: better to block a legitimate analytics tag than to
+             * accidentally let an undeclared marketing tracker through.
              */
             function detectCategory(script) {
                 var src = script.src || script.innerHTML || '';
-                
+
                 for (var category in patterns) {
                     for (var i = 0; i < patterns[category].length; i++) {
                         if (src.indexOf(patterns[category][i]) !== -1) {
@@ -413,7 +413,7 @@ class TG_GDPR_Public {
                         }
                     }
                 }
-                return 'necessary';
+                return 'marketing';
             }
             
             /**
@@ -603,6 +603,107 @@ class TG_GDPR_Public {
      *
      * @return int
      */
+    /**
+     * Build the script-blocker pattern map for the inline `<script>` in <head>.
+     *
+     * Strategy:
+     *   1. Start with a hardcoded list of universally-recognised tracker
+     *      fingerprints (the major ad networks, analytics platforms, etc.).
+     *   2. Append per-site `script_pattern` strings from the most recent
+     *      auto-scan, indexed by the cookie's category. This is what makes the
+     *      blocker "auto" — customer-specific scripts the scanner discovered
+     *      get blocked even if they're not on our hardcoded list.
+     *   3. Filter via the `tg_gdpr_blocker_patterns` action so site owners can
+     *      override per-script (mark something as `necessary` to allow it pre-consent).
+     *
+     * Anything that doesn't match any pattern falls through to the default in
+     * detectCategory(), which is `marketing` (block-by-default).
+     *
+     * @return array<string, string[]>  category => list of substring patterns
+     */
+    private function build_blocker_patterns() {
+        $base = array(
+            'analytics' => array(
+                // Google
+                'google-analytics.com', 'googletagmanager.com', 'gtag', 'ga(',
+                // Open-source / privacy-friendly
+                'matomo', 'plausible', 'simpleanalytics', 'umami',
+                // Microsoft Clarity
+                'clarity.ms',
+                // Adobe / Mixpanel / Segment / Amplitude
+                'omtrdc.net', 'mixpanel.com', 'segment.io', 'amplitude.com',
+                // Yandex
+                'mc.yandex.ru',
+            ),
+            'marketing' => array(
+                // Meta / Facebook
+                'facebook.net', 'fbevents', 'fbq(', 'connect.facebook.net',
+                // Google Ads / DoubleClick
+                'doubleclick.net', 'googleadservices', 'googlesyndication',
+                // Twitter / X
+                'ads-twitter.com', 'static.ads-twitter.com', 't.co/i/adsct',
+                // LinkedIn
+                'snap.licdn.com', 'linkedin.com/li/track', 'linkedin.com/insight',
+                // TikTok
+                'analytics.tiktok.com', 'tiktok.com/i18n/pixel', 'ttq.load',
+                // Pinterest
+                'ct.pinterest.com', 's.pinimg.com',
+                // Snapchat
+                'sc-static.net', 'tr.snapchat.com',
+                // Reddit
+                'alb.reddit.com', 'redditstatic.com',
+                // Microsoft / Bing Ads
+                'bat.bing.com',
+                // Hotjar / Lucky Orange / FullStory (session replay = marketing)
+                'hotjar.com', 'static.hotjar.com', 'luckyorange.com', 'fullstory.com',
+                // Pardot, HubSpot, Marketo
+                'pi.pardot.com', 'js.hs-scripts.com', 'munchkin.marketo.net',
+            ),
+            'functional' => array(
+                // Maps
+                'maps.googleapis.com', 'api.mapbox.com',
+                // Embeds (iframes pulled in as functional)
+                'youtube.com/iframe', 'youtube.com/embed', 'player.vimeo.com',
+                // Captchas (necessary for security but classed functional)
+                'recaptcha', 'hcaptcha.com', 'cloudflare.com/turnstile',
+                // Live chat
+                'intercom.io', 'crisp.chat', 'tawk.to',
+            ),
+            'necessary' => array(
+                // Payment processors — never block these without explicit admin override.
+                'js.stripe.com', 'checkout.stripe.com',
+                'paypal.com/sdk', 'www.paypalobjects.com',
+                'klarna.com',
+            ),
+        );
+
+        // Append per-site script_patterns from the most recent scan.
+        $report = get_option('tg_gdpr_last_cookie_scan_report', array());
+        if (!empty($report['cookies']) && is_array($report['cookies'])) {
+            foreach ($report['cookies'] as $cookie) {
+                if (empty($cookie['script_pattern']) || empty($cookie['category'])) {
+                    continue;
+                }
+                $cat = $cookie['category'];
+                if (!isset($base[$cat])) {
+                    $base[$cat] = array();
+                }
+                if (!in_array($cookie['script_pattern'], $base[$cat], true)) {
+                    $base[$cat][] = $cookie['script_pattern'];
+                }
+            }
+        }
+
+        /**
+         * Filter the script-blocker pattern map. Use this to override defaults
+         * (e.g. mark a corporate analytics script as `necessary` to allow it
+         * pre-consent for ops monitoring).
+         *
+         * @param array<string,string[]> $patterns
+         */
+        return apply_filters('tg_gdpr_blocker_patterns', $base);
+    }
+
     private function get_cookie_expiry($settings = null) {
         $settings = is_array($settings) ? $settings : $this->get_merged_settings();
         $behavior = $this->get_behavior_config($settings);

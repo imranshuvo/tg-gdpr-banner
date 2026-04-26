@@ -11,9 +11,17 @@
 class TG_GDPR_License_Manager {
 
     /**
-     * License API endpoint
+     * Production API endpoint. Override at runtime by defining
+     * TG_GDPR_API_URL in wp-config.php (useful for staging/dev), or via the
+     * `tg_gdpr_api_url` filter.
      */
-    private $api_url = 'https://your-domain.com/api/v1/licenses';
+    const DEFAULT_API_URL = 'https://cookiely.site/api/v1/licenses';
+
+    /**
+     * License API endpoint — resolved per-call from get_api_url() so the
+     * filter and constant can be evaluated late.
+     */
+    private $api_url;
 
     /**
      * Option names
@@ -26,13 +34,26 @@ class TG_GDPR_License_Manager {
      * Initialize the class
      */
     public function __construct() {
+        $this->api_url = $this->resolve_api_url();
+
         // Daily license verification cron
         add_action('tg_gdpr_daily_license_check', array($this, 'verify_license_cron'));
-        
+
         // Schedule cron if not scheduled
         if (!wp_next_scheduled('tg_gdpr_daily_license_check')) {
             wp_schedule_event(time(), 'daily', 'tg_gdpr_daily_license_check');
         }
+    }
+
+    /**
+     * Resolve the active API endpoint:
+     *   1. TG_GDPR_API_URL constant (wp-config.php) — for staging/dev.
+     *   2. tg_gdpr_api_url filter — for last-mile overrides.
+     *   3. DEFAULT_API_URL — production cookiely.site endpoint.
+     */
+    private function resolve_api_url() {
+        $url = defined('TG_GDPR_API_URL') ? TG_GDPR_API_URL : self::DEFAULT_API_URL;
+        return apply_filters('tg_gdpr_api_url', rtrim($url, '/'));
     }
 
     /**
