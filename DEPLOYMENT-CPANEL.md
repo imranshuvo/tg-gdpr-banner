@@ -253,7 +253,48 @@ cPanel → **Cron Jobs** → add:
 
 The scheduler is what fires queued jobs, license expiry checks, etc.
 
-### 2.6 Verify
+### 2.6 Bootstrap the first super admin
+
+Once the app is running, you need at least one admin user to log in to
+`/admin` and configure Stripe keys, plans, etc.
+
+```bash
+cd ~/cookiely-app
+php artisan app:create-admin
+```
+
+You'll be prompted for an email; the command generates a random password and
+prints it once. Or pass everything non-interactively:
+
+```bash
+php artisan app:create-admin imran@cookiely.site \
+  --name="Imran Khan" \
+  --password='<your-secret>'
+```
+
+If the email already exists as a `customer`, the command offers to **promote**
+that user to admin (preserving their existing Customer linkage). If they're
+already an admin, it's a no-op.
+
+Other useful CLI commands:
+
+```bash
+# Create a customer outside the registration form (atomic User + Customer):
+php artisan app:create-customer alice@example.com --name="Alice" --company="Acme Ltd"
+
+# List users (filterable by role):
+php artisan app:list-users
+php artisan app:list-users --role=admin
+php artisan app:list-users --role=customer
+```
+
+**Terminology note**: today the role column has two values, `admin` (=
+super admin, has access to `/admin/*` panel) and `customer`. The planned
+post-launch refactor renames `admin → super_admin` and adds a per-site
+`owner|admin` pivot for multi-admin-per-site, but the MVP single-tier
+model is what's deployed.
+
+### 2.7 Verify
 
 Open `https://cookiely.site/` — landing page should render with the locale switcher in the nav.
 
@@ -264,8 +305,17 @@ cd ~/cookiely-app
 php artisan about | head -30          # shows Laravel version, env, drivers
 php artisan migrate:status            # shows all migrations RAN
 php artisan route:list --path=api     # shows your API routes
+php artisan app:list-users --role=admin   # confirms your super admin is in
 tail -f storage/logs/laravel.log      # leave running while you click around
 ```
+
+Then sign in at `https://cookiely.site/login` with the admin you just
+created and walk through:
+
+1. `/admin/settings/payments` — paste Stripe live (or test) keys
+2. `/admin/plans` — paste matching Stripe Price IDs onto each plan
+3. Stripe Dashboard → Webhooks → add endpoint `https://cookiely.site/webhooks/payments/stripe`
+   with the secret you also entered into the admin UI
 
 ---
 

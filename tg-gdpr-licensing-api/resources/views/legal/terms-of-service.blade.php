@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Terms of Service — {{ config('app.name') }}</title>
     <meta name="description" content="{{ config('app.name') }} Terms of Service.">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
+    <meta name="theme-color" content="#4f46e5">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="antialiased bg-white text-gray-900">
