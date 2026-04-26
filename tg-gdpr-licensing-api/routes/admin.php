@@ -8,6 +8,8 @@ use App\Http\Controllers\Admin\SiteController;
 use App\Http\Controllers\Admin\CookieDefinitionController;
 use App\Http\Controllers\Admin\DsarController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\PaymentSettingsController;
+use App\Http\Controllers\Admin\PlanController;
 
 // Admin routes - Protected by auth and role:admin middleware
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -16,6 +18,16 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         // Mail settings
         Route::get('settings/mail', [SettingsController::class, 'mail'])->name('settings.mail');
         Route::post('settings/mail/test', [SettingsController::class, 'testMail'])->name('settings.mail.test');
+
+        // Payment provider settings (Stripe + Frisbii)
+        Route::get('settings/payments', [PaymentSettingsController::class, 'index'])->name('settings.payments');
+        Route::post('settings/payments/{provider}', [PaymentSettingsController::class, 'update'])
+            ->where('provider', 'stripe|frisbii')->name('settings.payments.update');
+        Route::post('settings/payments/{provider}/test', [PaymentSettingsController::class, 'test'])
+            ->where('provider', 'stripe|frisbii')->name('settings.payments.test');
+
+        // Plans CRUD
+        Route::resource('plans', PlanController::class)->except(['show']);
     
     // Customers
     Route::resource('customers', CustomerController::class);

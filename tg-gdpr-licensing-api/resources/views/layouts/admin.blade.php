@@ -49,10 +49,22 @@
                     <span class="ml-3">DSARs</span>
                 </a>
 
+                <a href="{{ route('admin.plans.index') }}"
+                   class="flex items-center px-6 py-3 hover:bg-gray-800 {{ request()->routeIs('admin.plans.*') ? 'bg-gray-800 border-l-4 border-blue-500' : '' }}">
+                    <i class="fas fa-tag w-5"></i>
+                    <span class="ml-3">Plans</span>
+                </a>
+
+                <a href="{{ route('admin.settings.payments') }}"
+                   class="flex items-center px-6 py-3 hover:bg-gray-800 {{ request()->routeIs('admin.settings.payments*') ? 'bg-gray-800 border-l-4 border-blue-500' : '' }}">
+                    <i class="fas fa-credit-card w-5"></i>
+                    <span class="ml-3">Payments</span>
+                </a>
+
                 <a href="{{ route('admin.settings.mail') }}"
-                   class="flex items-center px-6 py-3 hover:bg-gray-800 {{ request()->routeIs('admin.settings.*') ? 'bg-gray-800 border-l-4 border-blue-500' : '' }}">
+                   class="flex items-center px-6 py-3 hover:bg-gray-800 {{ request()->routeIs('admin.settings.mail*') ? 'bg-gray-800 border-l-4 border-blue-500' : '' }}">
                     <i class="fas fa-cog w-5"></i>
-                    <span class="ml-3">Settings</span>
+                    <span class="ml-3">Mail</span>
                 </a>
         </aside>
 

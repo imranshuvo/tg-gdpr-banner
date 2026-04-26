@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
+use App\Services\Logging\ActivityLogger;
+use App\Services\Payments\PaymentManager;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Services\Logging\ActivityLogger;
 
 class SubscriptionController extends Controller
 {
@@ -122,5 +125,62 @@ class SubscriptionController extends Controller
         return redirect()
             ->route('customer.subscriptions.index')
             ->with('success', 'Subscription resumed successfully!');
+    }
+
+    /**
+     * Start a checkout session for the given plan via the active payment provider.
+     *
+     * Provider selection:
+     *   - If exactly one provider is enabled & configured, use it.
+     *   - If multiple are enabled, the customer picks via ?provider=stripe|frisbii.
+     *   - If none, redirect back with an explanatory error.
+     */
+    public function checkout(Request $request, string $planSlug, PaymentManager $payments): RedirectResponse
+    {
+        $plan = Plan::where('slug', $planSlug)->where('is_active', true)->firstOrFail();
+
+        $active = $payments->active();
+        if (empty($active)) {
+            return redirect()->route('customer.subscriptions.index')
+                ->with('error', 'No payment provider is configured. Please contact support.');
+        }
+
+        $providerName = $request->string('provider')->toString();
+        if ($providerName === '') {
+            $providerName = $payments->default()?->name() ?? array_key_first($active);
+        }
+
+        if (! isset($active[$providerName])) {
+            return redirect()->route('customer.subscriptions.index')
+                ->with('error', "Payment provider '{$providerName}' is not available.");
+        }
+
+        $driver = $active[$providerName];
+
+        try {
+            $session = $driver->startCheckout(
+                user:       Auth::user(),
+                plan:       $plan,
+                successUrl: route('customer.subscriptions.index') . '?checkout=success',
+                cancelUrl:  route('customer.subscriptions.index') . '?checkout=canceled',
+            );
+        } catch (\Throwable $e) {
+            return redirect()->route('customer.subscriptions.index')
+                ->with('error', 'Checkout could not start: ' . $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            description: "Checkout started: {$plan->name} via {$driver->label()}",
+            properties:  [
+                'plan_slug'           => $plan->slug,
+                'provider'            => $driver->name(),
+                'mode'                => $driver->mode(),
+                'provider_session_id' => $session->providerSessionId,
+            ],
+            event:   'checkout.started',
+            logName: 'payment',
+        );
+
+        return redirect()->away($session->url);
     }
 }

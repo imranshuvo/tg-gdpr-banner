@@ -25,6 +25,9 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
     Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
     Route::post('/subscriptions/resume', [SubscriptionController::class, 'resume'])->name('subscriptions.resume');
+
+    // Checkout — drives the selected payment provider's hosted checkout.
+    Route::get('/checkout/{plan}', [SubscriptionController::class, 'checkout'])->name('checkout');
     
     // Invoices
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');

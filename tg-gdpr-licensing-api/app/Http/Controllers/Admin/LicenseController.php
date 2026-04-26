@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\License;
 use App\Models\Customer;
+use App\Models\License;
+use App\Models\Plan;
 use App\Services\LicenseService;
 use Illuminate\Http\Request;
 
@@ -58,26 +59,29 @@ class LicenseController extends Controller
     public function create()
     {
         $customers = Customer::orderBy('name')->get();
-        
-        return view('admin.licenses.create', compact('customers'));
+        $plans     = Plan::active()->get();
+
+        return view('admin.licenses.create', compact('customers', 'plans'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
-            'plan_type' => 'required|in:single,triple,ten',
-            'status' => 'required|in:active,suspended',
-            'expires_at' => 'nullable|date',
+            'plan_id'     => 'required|exists:plans,id',
+            'status'      => 'required|in:active,suspended',
+            'expires_at'  => 'nullable|date',
         ]);
+
+        $plan    = Plan::findOrFail($validated['plan_id']);
+        $expires = isset($validated['expires_at']) ? new \DateTimeImmutable($validated['expires_at']) : null;
 
         $license = $this->licenseService->createLicense(
             $validated['customer_id'],
-            $validated['plan_type'],
-            $validated['expires_at'] ?? now()->addYear()
+            $plan,
+            $expires
         );
 
-        // Update status if not active
         if ($validated['status'] !== 'active') {
             $license->update(['status' => $validated['status']]);
         }

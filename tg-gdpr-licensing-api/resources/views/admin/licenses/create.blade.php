@@ -31,27 +31,24 @@
                         @enderror
                     </div>
 
-                    <!-- Plan Type -->
+                    <!-- Plan -->
                     <div>
-                        <label for="plan_type" class="block text-sm font-medium text-gray-700 mb-2">
-                            Plan Type <span class="text-red-500">*</span>
+                        <label for="plan_id" class="block text-sm font-medium text-gray-700 mb-2">
+                            Plan <span class="text-red-500">*</span>
                         </label>
-                        <select name="plan_type" 
-                                id="plan_type" 
+                        <select name="plan_id"
+                                id="plan_id"
                                 required
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('plan_type') border-red-500 @enderror">
-                            <option value="">Select a plan...</option>
-                            <option value="single" {{ old('plan_type') == 'single' ? 'selected' : '' }}>
-                                Single Site ($59/year)
-                            </option>
-                            <option value="triple" {{ old('plan_type') == 'triple' ? 'selected' : '' }}>
-                                3 Sites ($99/year)
-                            </option>
-                            <option value="ten" {{ old('plan_type') == 'ten' ? 'selected' : '' }}>
-                                10 Sites ($199/year)
-                            </option>
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('plan_id') border-red-500 @enderror">
+                            <option value="">Select a plan…</option>
+                            @foreach($plans as $plan)
+                                <option value="{{ $plan->id }}" {{ old('plan_id') == $plan->id ? 'selected' : '' }}>
+                                    {{ $plan->name }} ({{ $plan->max_sites }} site{{ $plan->max_sites === 1 ? '' : 's' }}{{ $plan->display_price ? ' · '.$plan->display_price.$plan->display_period : '' }})
+                                </option>
+                            @endforeach
                         </select>
-                        @error('plan_type')
+                        <p class="mt-1 text-xs text-gray-500">Plans are managed at <a href="{{ route('admin.plans.index') }}" class="text-blue-600">Plans</a>.</p>
+                        @error('plan_id')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>

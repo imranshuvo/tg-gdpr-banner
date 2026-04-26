@@ -12,6 +12,8 @@ class License extends Model
         'customer_id',
         'license_key',
         'plan',
+        'plan_id',
+        'provider_subscription_id',
         'max_activations',
         'expires_at',
         'status',
@@ -24,6 +26,11 @@ class License extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
     }
 
     public function activations(): HasMany
