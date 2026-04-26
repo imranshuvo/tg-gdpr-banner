@@ -21,56 +21,7 @@ class LandingController extends Controller
      */
     public function pricing()
     {
-        $plans = [
-            [
-                'name' => 'Starter',
-                'price' => 49,
-                'interval' => 'year',
-                'sites' => 1,
-                'features' => [
-                    'Single site license',
-                    'GDPR compliant cookie banner',
-                    'Customizable design',
-                    'Priority support',
-                    'Free updates for 1 year',
-                ],
-                'stripe_price_id' => config('services.stripe.plans.starter'),
-            ],
-            [
-                'name' => 'Professional',
-                'price' => 99,
-                'interval' => 'year',
-                'sites' => 5,
-                'popular' => true,
-                'features' => [
-                    'Up to 5 site licenses',
-                    'GDPR compliant cookie banner',
-                    'Advanced customization',
-                    'Priority support',
-                    'Free updates for 1 year',
-                    'Commercial use',
-                ],
-                'stripe_price_id' => config('services.stripe.plans.professional'),
-            ],
-            [
-                'name' => 'Agency',
-                'price' => 199,
-                'interval' => 'year',
-                'sites' => 25,
-                'features' => [
-                    'Up to 25 site licenses',
-                    'GDPR compliant cookie banner',
-                    'White-label options',
-                    'Dedicated support',
-                    'Lifetime updates',
-                    'Commercial use',
-                    'Agency toolkit',
-                ],
-                'stripe_price_id' => config('services.stripe.plans.agency'),
-            ],
-        ];
-
-        return view('landing.pricing', compact('plans'));
+        return redirect('/#pricing');
     }
 
     /**
@@ -116,6 +67,20 @@ class LandingController extends Controller
         ]);
 
         return back()->with('success', 'Thanks. We received your request and will send free access details to your email.');
+    }
+
+    /**
+     * Switch UI locale and persist it in the session.
+     */
+    public function switchLocale(Request $request, string $locale)
+    {
+        $supported = array_keys(config('locales.supported', []));
+
+        if (in_array($locale, $supported, true)) {
+            $request->session()->put('locale', $locale);
+        }
+
+        return back();
     }
 
     /**

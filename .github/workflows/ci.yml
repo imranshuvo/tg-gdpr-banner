@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Only one CI run per ref — supersede in-flight runs when new commits land.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  laravel:
+    name: Laravel — lint + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: tg-gdpr-licensing-api
+
+    env:
+      # Tests run against an in-memory SQLite DB — no service container needed.
+      # APP_KEY is non-secret in CI; the in-memory DB is ephemeral.
+      APP_ENV: testing
+      APP_DEBUG: false
+      APP_KEY: base64:dGVzdC1rZXktZm9yLWNpLW9ubHktbm90LWEtcmVhbC1zZWM=
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: bcmath, ctype, curl, fileinfo, intl, json, mbstring, openssl, pdo, pdo_sqlite, tokenizer, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-${{ hashFiles('tg-gdpr-licensing-api/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --no-interaction --prefer-dist
+
+      - name: PHP lint (syntax check)
+        run: |
+          find app routes config database lang resources/views tests \
+            -name '*.php' -print0 \
+          | xargs -0 -n1 -P4 -I{} php -l {} \
+          | (! grep -v 'No syntax errors')
+
+      - name: Run tests
+        run: php artisan test --no-coverage

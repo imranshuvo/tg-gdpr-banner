@@ -23,6 +23,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
+        $middleware->web(append: [
+            \App\Http\Middleware\SetLocale::class,
+        ]);
+
+        // Payment-provider webhooks are authenticated by signed payload, not by CSRF token.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/payments/*',
+            'stripe/webhook',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

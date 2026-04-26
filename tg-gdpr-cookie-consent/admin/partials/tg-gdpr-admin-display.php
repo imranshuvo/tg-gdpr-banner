@@ -9,15 +9,21 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (! current_user_can('manage_options')) {
+    wp_die(__('You do not have permission to access this page.', 'tg-gdpr-cookie-consent'));
+}
+
 $settings = get_option('tg_gdpr_settings', array());
 $license_manager = new TG_GDPR_License_Manager();
 $is_pro_active = $license_manager->is_license_active();
 
 // Handle form submission
 if (isset($_POST['tg_gdpr_save_settings']) && check_admin_referer('tg_gdpr_settings_nonce')) {
-    // Update settings (simplified - you'd want better handling)
-    update_option('tg_gdpr_settings', $_POST['tg_gdpr_settings']);
-    echo '<div class="tg-gdpr-notice success"><p>' . __('Settings saved successfully!', 'tg-gdpr-cookie-consent') . '</p></div>';
+    $admin = new TG_GDPR_Admin('tg-gdpr-cookie-consent', defined('TG_GDPR_VERSION') ? TG_GDPR_VERSION : '1.0.0');
+    $clean = $admin->sanitize_settings(wp_unslash($_POST['tg_gdpr_settings'] ?? array()));
+
+    update_option('tg_gdpr_settings', $clean);
+    echo '<div class="tg-gdpr-notice success"><p>' . esc_html__('Settings saved successfully!', 'tg-gdpr-cookie-consent') . '</p></div>';
     $settings = get_option('tg_gdpr_settings');
 }
 
