@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Site;
-use App\Models\SiteSettings;
 use App\Models\Customer;
 use App\Models\License;
+use App\Models\Site;
+use App\Models\SiteSettings;
+use App\Services\Analytics\SiteAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SiteController extends Controller
 {
+    public function __construct(private SiteAnalyticsService $analytics) {}
+
     /**
      * Display all sites across all customers (super admin view)
      */
@@ -390,187 +393,19 @@ class SiteController extends Controller
     }
 
     /**
-     * View analytics for a site
+     * View analytics for a site. Heavy lifting lives in SiteAnalyticsService —
+     * this controller just resolves the period and hands off.
      */
     public function analytics(Request $request, Site $site)
     {
-        $allowedPeriods = [7, 30, 90, 365];
         $period = (int) $request->integer('period', 30);
+        $analytics = $this->analytics->forSite($site, $period);
+        $recentConsents = $this->analytics->recentConsents($site, $period);
 
-        if (!in_array($period, $allowedPeriods, true)) {
+        if (! in_array($period, SiteAnalyticsService::ALLOWED_PERIODS, true)) {
             $period = 30;
         }
 
-        $endDate = now()->endOfDay();
-        $startDate = now()->subDays($period - 1)->startOfDay();
-        $previousStartDate = $startDate->copy()->subDays($period);
-        $previousEndDate = $startDate->copy()->subSecond();
-
-        $sessions = $site->sessions()
-            ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
-            ->orderBy('date')
-            ->get();
-
-        $previousSessions = $site->sessions()
-            ->whereBetween('date', [$previousStartDate->toDateString(), $previousEndDate->toDateString()])
-            ->get();
-
-        $recentConsents = $site->consentRecords()
-            ->where('created_at', '>=', $startDate)
-            ->latest()
-            ->take(10)
-            ->get();
-
-        $usage = $site->usage()
-            ->where('year', now()->year)
-            ->where('month', now()->month)
-            ->first();
-
-        $totalSessions = (int) $sessions->sum('total_sessions');
-        $bannerShown = (int) $sessions->sum('banner_shown');
-        $acceptAllCount = (int) $sessions->sum('consent_given');
-        $rejectAllCount = (int) $sessions->sum('consent_denied');
-        $customCount = (int) $sessions->sum('consent_customized');
-        $totalConsents = $acceptAllCount + $rejectAllCount + $customCount;
-        $noInteractionCount = max((int) $sessions->sum('no_action'), max(0, $bannerShown - $totalConsents));
-
-        $consentRate = $bannerShown > 0
-            ? round(($totalConsents / $bannerShown) * 100, 1)
-            : null;
-
-        $acceptAllRate = $totalConsents > 0
-            ? round(($acceptAllCount / $totalConsents) * 100, 1)
-            : 0.0;
-
-        $previousTotalSessions = (int) $previousSessions->sum('total_sessions');
-        $sessionChange = $this->calculateTrendPercentage($totalSessions, $previousTotalSessions);
-
-        $currentMonthSessions = $usage?->total_sessions ?? $site->getCurrentMonthSessions();
-        $sessionLimit = $usage?->session_limit ?? $site->getSessionLimit();
-
-        $analytics = [
-            'total_sessions' => $totalSessions,
-            'session_change' => $sessionChange,
-            'total_consents' => $totalConsents,
-            'consent_rate' => $consentRate,
-            'has_banner_data' => $bannerShown > 0,
-            'accept_all_count' => $acceptAllCount,
-            'accept_all_rate' => $acceptAllRate,
-            'reject_all_count' => $rejectAllCount,
-            'custom_count' => $customCount,
-            'no_interaction_count' => $noInteractionCount,
-            'sessions_used' => $currentMonthSessions,
-            'sessions_limit' => $sessionLimit,
-            'usage_percentage' => $sessionLimit > 0
-                ? round(min(100, ($currentMonthSessions / $sessionLimit) * 100), 1)
-                : 100.0,
-            'category_rates' => $this->buildCategoryRates($sessions, $totalConsents),
-            'sessions_labels' => $this->buildSessionLabels($sessions, $startDate, $endDate),
-            'sessions_data' => $this->buildSessionData($sessions, $startDate, $endDate),
-            'gcm_stats' => $this->buildGcmStats($site, $startDate),
-            'top_countries' => $this->aggregateBreakdown($sessions, 'geo_breakdown'),
-            'device_breakdown' => $this->aggregateBreakdown($sessions, 'device_breakdown'),
-        ];
-
         return view('admin.sites.analytics', compact('site', 'analytics', 'recentConsents', 'period'));
-    }
-
-    private function calculateTrendPercentage(int $current, int $previous): float
-    {
-        if ($previous <= 0) {
-            return $current > 0 ? 100.0 : 0.0;
-        }
-
-        return round((($current - $previous) / $previous) * 100, 1);
-    }
-
-    private function buildCategoryRates($sessions, int $totalConsents): array
-    {
-        if ($totalConsents <= 0) {
-            return [
-                'necessary' => 100.0,
-                'functional' => 0.0,
-                'analytics' => 0.0,
-                'marketing' => 0.0,
-            ];
-        }
-
-        return [
-            'necessary' => 100.0,
-            'functional' => round(($sessions->sum('accepted_functional') / $totalConsents) * 100, 1),
-            'analytics' => round(($sessions->sum('accepted_analytics') / $totalConsents) * 100, 1),
-            'marketing' => round(($sessions->sum('accepted_marketing') / $totalConsents) * 100, 1),
-        ];
-    }
-
-    private function buildSessionLabels($sessions, $startDate, $endDate): array
-    {
-        $labels = [];
-
-        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            $labels[] = $date->format('M j');
-        }
-
-        return $labels;
-    }
-
-    private function buildSessionData($sessions, $startDate, $endDate): array
-    {
-        $sessionsByDate = $sessions->keyBy(fn ($session) => $session->date->toDateString());
-        $data = [];
-
-        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            $data[] = (int) ($sessionsByDate[$date->toDateString()]->total_sessions ?? 0);
-        }
-
-        return $data;
-    }
-
-    private function buildGcmStats(Site $site, $startDate): array
-    {
-        $keys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
-        $stats = [];
-
-        foreach ($keys as $key) {
-            $stats[$key] = ['granted' => 0, 'total' => 0];
-        }
-
-        $site->consentRecords()
-            ->where('created_at', '>=', $startDate)
-            ->whereNotNull('gcm_state')
-            ->select(['id', 'gcm_state'])
-            ->orderBy('id')
-            ->chunkById(500, function ($records) use (&$stats, $keys) {
-                foreach ($records as $record) {
-                    foreach ($keys as $key) {
-                        if (!array_key_exists($key, $record->gcm_state ?? [])) {
-                            continue;
-                        }
-
-                        $stats[$key]['total']++;
-
-                        if (($record->gcm_state[$key] ?? null) === 'granted') {
-                            $stats[$key]['granted']++;
-                        }
-                    }
-                }
-            });
-
-        return $stats;
-    }
-
-    private function aggregateBreakdown($sessions, string $field): array
-    {
-        $totals = [];
-
-        foreach ($sessions as $session) {
-            foreach (($session->{$field} ?? []) as $key => $count) {
-                $totals[$key] = ($totals[$key] ?? 0) + (int) $count;
-            }
-        }
-
-        arsort($totals);
-
-        return array_slice($totals, 0, 5, true);
     }
 }

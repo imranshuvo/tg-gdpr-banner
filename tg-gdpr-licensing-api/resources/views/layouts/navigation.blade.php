@@ -32,6 +32,9 @@
                         <x-nav-link :href="route('customer.dashboard')" :active="request()->routeIs('customer.dashboard')">
                             {{ __('Dashboard') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('customer.sites.index')" :active="request()->routeIs('customer.sites.*')">
+                            {{ __('Sites') }}
+                        </x-nav-link>
                         <x-nav-link :href="route('customer.licenses.index')" :active="request()->routeIs('customer.licenses.*')">
                             {{ __('My Licenses') }}
                         </x-nav-link>
@@ -110,6 +113,9 @@
             @else
                 <x-responsive-nav-link :href="route('customer.dashboard')" :active="request()->routeIs('customer.dashboard')">
                     {{ __('Dashboard') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('customer.sites.index')" :active="request()->routeIs('customer.sites.*')">
+                    {{ __('Sites') }}
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('customer.licenses.index')" :active="request()->routeIs('customer.licenses.*')">
                     {{ __('My Licenses') }}

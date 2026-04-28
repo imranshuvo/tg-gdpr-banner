@@ -6,11 +6,18 @@ use App\Http\Controllers\Customer\LicenseController as CustomerLicenseController
 use App\Http\Controllers\Customer\ApiKeyController;
 use App\Http\Controllers\Customer\SubscriptionController;
 use App\Http\Controllers\Customer\InvoiceController;
+use App\Http\Controllers\Customer\SiteController as CustomerSiteController;
 
 // Customer routes - Protected by auth and role:customer middleware
 Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer.')->group(function () {
     Route::get('/', [CustomerDashboardController::class, 'index'])->name('dashboard');
     
+    // Sites — per-site management + analytics
+    Route::get('/sites', [CustomerSiteController::class, 'index'])->name('sites.index');
+    Route::get('/sites/{site}', [CustomerSiteController::class, 'show'])->name('sites.show');
+    Route::get('/sites/{site}/analytics', [CustomerSiteController::class, 'analytics'])->name('sites.analytics');
+    Route::delete('/sites/{site}/activations/{activation}', [CustomerSiteController::class, 'deactivateActivation'])->name('sites.deactivate-activation');
+
     // Licenses
     Route::get('/licenses', [CustomerLicenseController::class, 'index'])->name('licenses.index');
     Route::get('/licenses/{license}', [CustomerLicenseController::class, 'show'])->name('licenses.show');

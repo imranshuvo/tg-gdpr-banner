@@ -28,6 +28,11 @@ class Customer extends Model
         return $this->hasMany(License::class);
     }
 
+    public function sites(): HasMany
+    {
+        return $this->hasMany(Site::class);
+    }
+
     public function user(): HasOne
     {
         return $this->hasOne(User::class);
