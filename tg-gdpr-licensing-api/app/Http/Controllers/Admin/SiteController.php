@@ -8,13 +8,17 @@ use App\Models\License;
 use App\Models\Site;
 use App\Models\SiteSettings;
 use App\Services\Analytics\SiteAnalyticsService;
+use App\Services\Compliance\GdprReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SiteController extends Controller
 {
-    public function __construct(private SiteAnalyticsService $analytics) {}
+    public function __construct(
+        private SiteAnalyticsService $analytics,
+        private GdprReportService $gdprReport,
+    ) {}
 
     /**
      * Display all sites across all customers (super admin view)
@@ -407,5 +411,31 @@ class SiteController extends Controller
         }
 
         return view('admin.sites.analytics', compact('site', 'analytics', 'recentConsents', 'period'));
+    }
+
+    /**
+     * Per-site GDPR compliance report (super-admin view).
+     *
+     * Same payload as the customer-facing report, served from the admin
+     * side so super-admins can audit any tenant's compliance posture
+     * without having to impersonate the customer.
+     */
+    public function gdprReport(Request $request, Site $site)
+    {
+        $period = (int) $request->integer('period', 90);
+        $report = $this->gdprReport->forSite($site, $period);
+
+        if ($request->wantsJson() || $request->query('format') === 'json') {
+            $filename = 'gdpr-report-' . Str::slug($site->domain) . '-' . now()->format('Y-m-d') . '.json';
+            return response()->json($report, 200, [
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+
+        return view('admin.sites.gdpr-report', [
+            'site'   => $site,
+            'report' => $report,
+            'period' => in_array($period, GdprReportService::ALLOWED_PERIODS, true) ? $period : 90,
+        ]);
     }
 }

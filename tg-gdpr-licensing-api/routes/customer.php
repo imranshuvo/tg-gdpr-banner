@@ -16,6 +16,7 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::get('/sites', [CustomerSiteController::class, 'index'])->name('sites.index');
     Route::get('/sites/{site}', [CustomerSiteController::class, 'show'])->name('sites.show');
     Route::get('/sites/{site}/analytics', [CustomerSiteController::class, 'analytics'])->name('sites.analytics');
+    Route::get('/sites/{site}/gdpr-report', [CustomerSiteController::class, 'gdprReport'])->name('sites.gdpr-report');
     Route::delete('/sites/{site}/activations/{activation}', [CustomerSiteController::class, 'deactivateActivation'])->name('sites.deactivate-activation');
 
     // Licenses

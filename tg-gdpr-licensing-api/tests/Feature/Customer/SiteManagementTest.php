@@ -155,4 +155,56 @@ class SiteManagementTest extends TestCase
     {
         $this->get(route('customer.sites.index'))->assertRedirect(route('login'));
     }
+
+    public function test_customer_can_open_gdpr_report_html(): void
+    {
+        $this->actingAs($this->user)
+            ->get(route('customer.sites.gdpr-report', $this->site))
+            ->assertOk()
+            ->assertSee('GDPR Compliance Report')
+            ->assertSee('Tamper evidence')
+            ->assertSee('Sub-processors');
+    }
+
+    public function test_customer_can_download_gdpr_report_as_json(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->get(route('customer.sites.gdpr-report', ['site' => $this->site, 'format' => 'json']));
+
+        $expectedFilename = 'gdpr-report-' . \Illuminate\Support\Str::slug($this->site->domain) . '-' . now()->format('Y-m-d') . '.json';
+
+        $response->assertOk()
+            ->assertHeader('Content-Disposition', "attachment; filename=\"{$expectedFilename}\"")
+            ->assertJsonStructure([
+                'site'            => ['id', 'domain'],
+                'period'          => ['from', 'to', 'days'],
+                'summary',
+                'consents'        => ['by_method', 'by_category_acceptance_pct', 'gcm_v2_signals'],
+                'tamper_evidence' => ['sample_size', 'integrity_status', 'algorithm'],
+                'cookies',
+                'dsar',
+                'retention',
+                'banner_config',
+                'sub_processors',
+                'metadata',
+            ]);
+    }
+
+    public function test_customer_cannot_open_other_customers_gdpr_report(): void
+    {
+        $other = Customer::create(['name' => 'Other', 'email' => 'o2@o.test']);
+        $otherSite = Site::create([
+            'customer_id' => $other->id,
+            'license_id'  => null,
+            'domain'      => 'forbidden-report.test',
+            'site_url'    => 'https://forbidden-report.test',
+            'site_name'   => 'Forbidden',
+            'site_token'  => 'tok-' . bin2hex(random_bytes(8)),
+            'status'      => 'active',
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('customer.sites.gdpr-report', $otherSite))
+            ->assertForbidden();
+    }
 }

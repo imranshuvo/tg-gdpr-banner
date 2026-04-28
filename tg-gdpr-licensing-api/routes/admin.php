@@ -47,6 +47,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('sites/{site}/cookies', [SiteController::class, 'cookies'])->name('sites.cookies');
     Route::get('sites/{site}/consents', [SiteController::class, 'consents'])->name('sites.consents');
     Route::get('sites/{site}/analytics', [SiteController::class, 'analytics'])->name('sites.analytics');
+    Route::get('sites/{site}/gdpr-report', [SiteController::class, 'gdprReport'])->name('sites.gdpr-report');
     
     // Global Cookie Definitions
     Route::resource('cookie-definitions', CookieDefinitionController::class);

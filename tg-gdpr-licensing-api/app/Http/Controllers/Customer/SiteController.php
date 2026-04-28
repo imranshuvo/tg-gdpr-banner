@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Activation;
 use App\Models\Site;
 use App\Services\Analytics\SiteAnalyticsService;
+use App\Services\Compliance\GdprReportService;
 use App\Services\Logging\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 /**
  * Customer-facing per-site management.
@@ -24,6 +26,7 @@ class SiteController extends Controller
     public function __construct(
         private SiteAnalyticsService $analytics,
         private ActivityLogger $activityLogger,
+        private GdprReportService $gdprReport,
     ) {}
 
     /**
@@ -80,6 +83,32 @@ class SiteController extends Controller
             'analytics'       => $payload,
             'recentConsents'  => $recent,
             'period'          => in_array($period, SiteAnalyticsService::ALLOWED_PERIODS, true) ? $period : 30,
+        ]);
+    }
+
+    /**
+     * Per-site GDPR compliance report. Renders HTML for screen review, or
+     * JSON for `?format=json` / `Accept: application/json` so the customer
+     * can hand it to an auditor or archive it.
+     */
+    public function gdprReport(Request $request, Site $site)
+    {
+        $this->authorizeSite($site);
+
+        $period = (int) $request->integer('period', 90);
+        $report = $this->gdprReport->forSite($site, $period);
+
+        if ($request->wantsJson() || $request->query('format') === 'json') {
+            $filename = 'gdpr-report-' . Str::slug($site->domain) . '-' . now()->format('Y-m-d') . '.json';
+            return response()->json($report, 200, [
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+
+        return view('customer.sites.gdpr-report', [
+            'site'   => $site,
+            'report' => $report,
+            'period' => in_array($period, GdprReportService::ALLOWED_PERIODS, true) ? $period : 90,
         ]);
     }
 

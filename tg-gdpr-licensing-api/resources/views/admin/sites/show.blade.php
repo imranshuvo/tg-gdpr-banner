@@ -17,6 +17,9 @@
             <p class="text-sm text-gray-500">{{ $site->site_name ?? $site->site_url }}</p>
         </div>
         <div class="flex gap-2">
+            <a href="{{ route('admin.sites.gdpr-report', $site) }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-md">
+                <i class="fas fa-shield-alt mr-2"></i> GDPR Report
+            </a>
             <a href="{{ route('admin.sites.settings', $site) }}" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md">
                 <i class="fas fa-cog mr-2"></i> Settings
             </a>

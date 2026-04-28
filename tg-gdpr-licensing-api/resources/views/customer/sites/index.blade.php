@@ -69,6 +69,7 @@
                                     <td class="px-6 py-4 text-right text-sm space-x-3 whitespace-nowrap">
                                         <a href="{{ route('customer.sites.show', $site) }}" class="text-indigo-600 hover:text-indigo-800">Manage</a>
                                         <a href="{{ route('customer.sites.analytics', $site) }}" class="text-indigo-600 hover:text-indigo-800">Analytics</a>
+                                        <a href="{{ route('customer.sites.gdpr-report', $site) }}" class="text-emerald-600 hover:text-emerald-800">GDPR Report</a>
                                     </td>
                                 </tr>
                             @endforeach

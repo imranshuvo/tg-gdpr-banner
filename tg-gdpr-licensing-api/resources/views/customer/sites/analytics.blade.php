@@ -12,7 +12,8 @@
                         {{ $p === 365 ? '1y' : $p . 'd' }}
                     </a>
                 @endforeach
-                <a href="{{ route('customer.sites.show', $site) }}" class="ml-3 text-sm text-gray-600 hover:text-gray-900">← Back</a>
+                <a href="{{ route('customer.sites.gdpr-report', $site) }}" class="ml-3 inline-flex items-center px-3 py-1.5 text-sm rounded-md bg-emerald-600 hover:bg-emerald-700 text-white">GDPR Report</a>
+                <a href="{{ route('customer.sites.show', $site) }}" class="ml-1 text-sm text-gray-600 hover:text-gray-900">← Back</a>
             </div>
         </div>
     </x-slot>
