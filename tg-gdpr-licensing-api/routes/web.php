@@ -7,8 +7,13 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// /dashboard kept as a thin role-redirect shim so old bookmarks, the
+// Breeze password-reset success flow, and email-verification links still
+// land somewhere useful. The real per-role landing pages are
+// /admin (super admins) and /customer (customers).
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    $user = auth()->user();
+    return redirect($user?->isAdmin() ? route('admin.dashboard') : route('customer.dashboard'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {

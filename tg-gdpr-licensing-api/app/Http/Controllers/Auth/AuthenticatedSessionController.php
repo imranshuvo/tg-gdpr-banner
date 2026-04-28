@@ -21,6 +21,10 @@ class AuthenticatedSessionController extends Controller
 
     /**
      * Handle an incoming authentication request.
+     *
+     * Sends the user to their role-appropriate landing page after auth.
+     * `intended()` still wins if the user was bounced from a deep link —
+     * e.g. a customer who tried /customer/sites pre-login still lands there.
      */
     public function store(LoginRequest $request): RedirectResponse
     {
@@ -28,7 +32,17 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended($this->postLoginPath($request->user()));
+    }
+
+    /**
+     * Where to send a freshly-authed user when there's no `intended` URL.
+     */
+    private function postLoginPath($user): string
+    {
+        return $user?->isAdmin()
+            ? route('admin.dashboard', absolute: false)
+            : route('customer.dashboard', absolute: false);
     }
 
     /**
