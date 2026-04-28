@@ -110,23 +110,27 @@
                     </label>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Geo scope</label>
-                    <select name="geo_targeting_mode" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm @error('geo_targeting_mode') border-red-500 @enderror">
-                        <option value="all" {{ $geoMode === 'all' ? 'selected' : '' }}>All countries</option>
-                        <option value="eu" {{ $geoMode === 'eu' ? 'selected' : '' }}>EU/EEA/UK/CH only</option>
-                        <option value="selected" {{ $geoMode === 'selected' ? 'selected' : '' }}>Selected European countries only</option>
-                    </select>
-                </div>
+                <div x-data="{ mode: '{{ $geoMode }}' }" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Geo scope</label>
+                        <select name="geo_targeting_mode" x-model="mode"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm @error('geo_targeting_mode') border-red-500 @enderror">
+                            <option value="all">All countries</option>
+                            <option value="eu">EU/EEA/UK/CH only</option>
+                            <option value="selected">Selected European countries only</option>
+                        </select>
+                    </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Selected countries</label>
-                    <select name="geo_countries[]" multiple size="10"
-                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm @error('geo_countries') border-red-500 @enderror">
-                        @foreach ($availableGeoCountries as $code => $label)
-                            <option value="{{ $code }}" {{ in_array($code, $selectedGeoCountries, true) ? 'selected' : '' }}>{{ $label }} ({{ $code }})</option>
-                        @endforeach
-                    </select>
+                    <div x-show="mode === 'selected'" x-cloak x-transition>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Selected countries</label>
+                        <select name="geo_countries[]" multiple size="10"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm @error('geo_countries') border-red-500 @enderror">
+                            @foreach ($availableGeoCountries as $code => $label)
+                                <option value="{{ $code }}" {{ in_array($code, $selectedGeoCountries, true) ? 'selected' : '' }}>{{ $label }} ({{ $code }})</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">Hold Ctrl (Cmd on Mac) to multi-select.</p>
+                    </div>
                 </div>
             </div>
         </div>

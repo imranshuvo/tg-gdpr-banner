@@ -161,26 +161,29 @@
                     <div class="px-6 py-4 border-b border-gray-200">
                         <h3 class="text-base font-semibold text-gray-900"><i class="fas fa-globe mr-2 text-gray-500"></i>Geo targeting</h3>
                     </div>
-                    <div class="p-6 space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Banner scope</label>
-                            <select name="geo_targeting_mode" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm @error('geo_targeting_mode') border-red-500 @enderror">
-                                <option value="all" {{ $geoMode === 'all' ? 'selected' : '' }}>All countries</option>
-                                <option value="eu" {{ $geoMode === 'eu' ? 'selected' : '' }}>EU/EEA/UK/CH only</option>
-                                <option value="selected" {{ $geoMode === 'selected' ? 'selected' : '' }}>Selected European countries only</option>
-                            </select>
-                            <p class="mt-1 text-xs text-gray-500">Where the CMP banner + regional consent defaults apply.</p>
-                            @error('geo_targeting_mode')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Selected countries</label>
-                            <select name="geo_countries[]" multiple size="10"
-                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                                @foreach ($availableGeoCountries as $code => $label)
-                                    <option value="{{ $code }}" {{ in_array($code, $selectedGeoCountries, true) ? 'selected' : '' }}>{{ $label }} ({{ $code }})</option>
-                                @endforeach
-                            </select>
-                            <p class="mt-1 text-xs text-gray-500">Only used when "Selected European countries only" is chosen.</p>
+                    <div class="p-6" x-data="{ mode: '{{ $geoMode }}' }">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Banner scope</label>
+                                <select name="geo_targeting_mode" x-model="mode"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm @error('geo_targeting_mode') border-red-500 @enderror">
+                                    <option value="all">All countries</option>
+                                    <option value="eu">EU/EEA/UK/CH only</option>
+                                    <option value="selected">Selected European countries only</option>
+                                </select>
+                                <p class="mt-1 text-xs text-gray-500">Where the CMP banner + regional consent defaults apply.</p>
+                                @error('geo_targeting_mode')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <div x-show="mode === 'selected'" x-cloak x-transition>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Selected countries</label>
+                                <select name="geo_countries[]" multiple size="10"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    @foreach ($availableGeoCountries as $code => $label)
+                                        <option value="{{ $code }}" {{ in_array($code, $selectedGeoCountries, true) ? 'selected' : '' }}>{{ $label }} ({{ $code }})</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1 text-xs text-gray-500">Hold Ctrl (Cmd on Mac) to multi-select.</p>
+                            </div>
                         </div>
                     </div>
                 </div>

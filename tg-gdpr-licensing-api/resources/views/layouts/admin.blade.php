@@ -79,9 +79,41 @@
                     <h2 class="text-2xl font-semibold text-gray-800">
                         @yield('page-title', 'Dashboard')
                     </h2>
-                    
-                    <div class="flex items-center space-x-4">
-                        <span class="text-gray-600">{{ now()->format('M d, Y') }}</span>
+
+                    <div class="flex items-center gap-4">
+                        <span class="hidden md:inline text-sm text-gray-500">{{ now()->format('M d, Y') }}</span>
+
+                        {{-- User menu --}}
+                        <div x-data="{ open: false }" @keydown.escape.window="open = false" class="relative">
+                            <button type="button" @click="open = !open"
+                                    class="inline-flex items-center gap-2 rounded-full bg-gray-100 hover:bg-gray-200 pl-3 pr-2 py-1.5 transition"
+                                    :aria-expanded="open" aria-haspopup="menu">
+                                <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white text-xs font-bold uppercase">
+                                    {{ Str::substr(Auth::user()->name, 0, 1) }}
+                                </span>
+                                <span class="text-sm font-medium text-gray-800">{{ Auth::user()->name }}</span>
+                                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500">
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+
+                            <div x-show="open" @click.outside="open = false" x-cloak x-transition
+                                 class="absolute right-0 mt-2 w-56 rounded-xl border border-gray-200 bg-white shadow-lg shadow-slate-900/5 py-2 z-50" role="menu">
+                                <div class="px-4 py-2 border-b border-gray-100">
+                                    <div class="text-sm font-semibold text-gray-900">{{ Auth::user()->name }}</div>
+                                    <div class="text-xs text-gray-500 truncate">{{ Auth::user()->email }}</div>
+                                </div>
+                                <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fas fa-user-cog w-4 text-gray-400"></i> Profile
+                                </a>
+                                <form method="POST" action="{{ route('logout') }}" class="border-t border-gray-100 mt-1 pt-1">
+                                    @csrf
+                                    <button type="submit" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                                        <i class="fas fa-sign-out-alt w-4 text-red-500"></i> Sign out
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </header>
